@@ -25,22 +25,26 @@ Dashboard che mostra:
 
 ## Roadmap
 
-### MVP (Settimana 1-2)
-- [ ] Setup progetto e repo
-- [ ] Dashboard base con metriche
-- [ ] Integrazione OpenAI proxy/logging
-- [ ] Auth utenti
+### MVP (Settimana 1-2) ✅ COMPLETATO
+- [x] Setup progetto e repo
+- [x] Landing page con value proposition
+- [x] Dashboard base con metriche
+- [x] Integrazione OpenAI proxy/logging
+- [x] Database schema (Supabase)
+- [ ] Auth utenti (next)
 
 ### v1.0 (Settimana 3)
-- [ ] Detection duplicate calls
-- [ ] Alert budget
-- [ ] Export report
+- [ ] Detection duplicate calls completo
+- [ ] Alert budget via email
+- [ ] Export report CSV/PDF
 - [ ] Onboarding wizard
+- [ ] Supporto Anthropic
 
 ### v1.1 (Future)
-- [ ] Supporto multi-provider (Anthropic, Cohere)
-- [ ] AI suggestions per ottimizzazione
+- [ ] AI suggestions per ottimizzazione prompt
 - [ ] Team collaboration
+- [ ] Caching layer
+- [ ] Mobile app
 
 ## Costi Stimati
 | Piano | Utenti | Costo/mese |
@@ -59,4 +63,21 @@ Dashboard che mostra:
 - Compliance: GDPR-ready, dati logs anonimizzati
 
 ## Stato Attuale
-🔄 Inizializzazione progetto...
+✅ MVP COMPLETATO - Pronto per deploy su Vercel
+
+### Commit Recent:
+- `f2c2f0f` feat: TokenGuard MVP implementation
+- `551b7a3` docs: add PROJECT_LOG with research and product decision
+- `33f9e4a` docs: update README with Supabase config
+
+### Branch Status:
+- `main` ✅ aggiornato
+- `dev` ✅ aggiornato  
+- `sughifabre` ✅ aggiornato (deploy branch)
+
+## Prossimi Passi
+1. Deploy su Vercel dalla branch `sughifabre`
+2. Configurare environment variables su Vercel
+3. Eseguire migration SQL su Supabase
+4. Test proxy endpoint
+5. Aggiungere auth utenti
