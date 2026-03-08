@@ -10,7 +10,8 @@ import {
   Zap,
   LogOut,
   BarChart3,
-  BookOpen
+  BookOpen,
+  Settings
 } from 'lucide-react'
 
 interface ApiLog {
@@ -119,7 +120,11 @@ export default function DashboardPage() {
               <Link href="/docs" className="p-2 hover:text-[#FFD700] transition" title="Documentazione & Integrazione">
                 <BookOpen size={18} />
               </Link>
-              <Link href="/" className="p-2 hover:text-[#FFD700] transition">
+              <Link href="/settings" className="p-2 hover:text-[#FFD700] transition" title="Impostazioni">
+                <Settings size={18} />
+              </Link>
+              <div className="h-6 w-px bg-[#222]" />
+              <Link href="/" className="p-2 hover:text-[#FFD700] transition" title="Logout">
                 <LogOut size={18} />
               </Link>
             </div>
