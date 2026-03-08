@@ -1,15 +1,17 @@
 'use client'
 
+'use client'
+
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
   Copy,
   Check,
-  Lock,
-  Activity,
-  Terminal,
-  Box
+  TrendingDown,
+  Wallet,
+  BarChart3,
+  Zap
 } from 'lucide-react';
 
 const GuardIcon = () => (
@@ -23,6 +25,13 @@ const GuardIcon = () => (
 export default function Home() {
   const [copied, setCopied] = useState(false);
   const [scanPos, setScanPos] = useState(0);
+  const [stats, setStats] = useState({
+    totalSaved: 0,
+    activeUsers: 0,
+    avgReduction: 0,
+    totalCalls: 0
+  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -31,8 +40,33 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    // Fetch stats from API endpoint instead of direct Supabase
+    fetchStats();
+  }, []);
+
+  async function fetchStats() {
+    try {
+      const response = await fetch('/api/stats');
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data);
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const copyCode = () => {
-    const code = "const tg = require('@tokenguard/core').watch('TG_992_X');";
+    const code = `const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: 'https://your-domain.vercel.app/api/v1/proxy/openai',
+  defaultHeaders: {
+    'X-TokenGuard-Key': process.env.TOKENGUARD_API_KEY,
+  },
+});`;
     navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -52,12 +86,12 @@ export default function Home() {
           <span className="text-xl font-black tracking-tighter uppercase italic">TokenGuard</span>
         </div>
         <div className="hidden lg:flex gap-10 text-[11px] font-bold tracking-widest uppercase">
-          <Link href="#features" className="hover:text-[#FFD700] border-b border-transparent hover:border-[#FFD700] transition-all">Stato_Rete</Link>
-          <Link href="#pricing" className="hover:text-[#FFD700] border-b border-transparent hover:border-[#FFD700] transition-all">Documentazione_V2</Link>
-          <Link href="/dashboard" className="hover:text-[#FFD700] border-b border-transparent hover:border-[#FFD700] transition-all">Audit_Sicurezza</Link>
+          <Link href="#features" className="hover:text-[#FFD700] border-b border-transparent hover:border-[#FFD700] transition-all">Features</Link>
+          <Link href="#how-it-works" className="hover:text-[#FFD700] border-b border-transparent hover:border-[#FFD700] transition-all">How_It_Works</Link>
+          <Link href="/dashboard" className="hover:text-[#FFD700] border-b border-transparent hover:border-[#FFD700] transition-all">Dashboard</Link>
         </div>
         <Link href="/login" className="border-2 border-[#FFD700] text-[#FFD700] px-4 py-1 flex items-center justify-center text-xs font-bold hover:bg-[#FFD700] hover:text-black transition-all uppercase">
-          Accedi_Console
+          Accedi
         </Link>
       </nav>
 
@@ -65,23 +99,24 @@ export default function Home() {
         <section className="px-6 pt-24 pb-16 max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
           <div className="relative z-10">
             <div className="inline-block bg-[#1A1A1A] border border-[#333] px-3 py-1 text-[10px] font-bold text-[#888] mb-6 uppercase tracking-widest">
-              [ Middleware Security Layer ]
+              [ LLM Cost Monitor ]
             </div>
-            <h1 className="text-6xl md:text-8xl font-black leading-[0.9] tracking-tighter mb-8 uppercase italic">
-              Blindate le <br /> vostre <span className="text-[#FFD700]">API.</span>
+            <h1 className="text-6xl md:text-7xl font-black leading-[0.9] tracking-tighter mb-8 uppercase italic">
+              Riduci i costi <br /> <span className="text-[#FFD700]">LLM del 30-50%</span>
             </h1>
             <p className="font-sans text-lg text-[#AAA] max-w-md mb-10 leading-snug">
-              Intercettazione, filtraggio e caching istantaneo. TokenGuard si posiziona tra il tuo server e il rumore del web. Una sola riga, controllo totale.
+              TokenGuard si posiziona tra la tua app e OpenAI/Anthropic. Logga ogni chiamata, 
+              cache le duplicate e ti mostra esattamente dove vai a spendere.
             </p>
 
             <div className="flex flex-wrap gap-4">
               <Link href="/signup" className="bg-[#FFD700] text-black font-black px-8 py-4 text-sm uppercase flex items-center gap-3 hover:translate-x-1 hover:-translate-y-1 transition-transform shadow-[4px_4px_0px_0px_rgba(255,215,0,0.2)]">
-                Attiva Sentinella <ArrowRight size={18} />
+                Inizia Gratis <ArrowRight size={18} />
               </Link>
               <div className="flex-grow max-w-sm bg-[#1A1A1A] border-2 border-[#222] p-4 relative overflow-hidden group">
                 <div className="flex justify-between items-center relative z-10">
-                  <code className="text-[#FFD700] text-xs">npm i @tokenguard/core</code>
-                  <button onClick={copyCode} className="text-[#444] hover:text-white">
+                  <code className="text-[#FFD700] text-xs truncate">npm i @tokenguard/core</code>
+                  <button onClick={copyCode} className="text-[#444] hover:text-white shrink-0 ml-2">
                     {copied ? <Check size={16} /> : <Copy size={16} />}
                   </button>
                 </div>
@@ -103,14 +138,14 @@ export default function Home() {
               <div className="text-[120px] font-black text-white/5 absolute -top-20 left-1/2 -translate-x-1/2 select-none">API</div>
               <div className="bg-[#0F0F0F] border-2 border-[#FFD700] p-8 inline-block shadow-[20px_20px_60px_rgba(0,0,0,0.8)]">
                 <div className="flex items-center gap-4 mb-4 text-[#FFD700]">
-                  <Activity size={24} />
-                  <span className="text-xs font-bold tracking-[0.3em] uppercase">Feed_Sicurezza</span>
+                  <Wallet size={24} />
+                  <span className="text-xs font-bold tracking-[0.3em] uppercase">Cost_Monitor</span>
                 </div>
                 <div className="space-y-2 text-left font-mono text-[10px]">
-                  <div className="text-green-500 underline">GET /v1/auth - 200 OK [12ms]</div>
-                  <div className="text-green-500 underline">POST /v1/payment - 201 CREATED [45ms]</div>
-                  <div className="text-red-500 animate-pulse font-bold">BLOCK /v1/admin - 403 REJECTED [INJECTION_DETECTION]</div>
-                  <div className="text-[#555]">GET /v1/static - 200 OK [FROM_CACHE]</div>
+                  <div className="text-green-500">POST /v1/chat/completions - $0.0024</div>
+                  <div className="text-green-500">POST /v1/chat/completions - $0.0012</div>
+                  <div className="text-[#FFD700] animate-pulse font-bold">CACHED /v1/chat/completions - $0.00 [SAVED]</div>
+                  <div className="text-[#555]">GET /v1/models - $0.00 [FROM_CACHE]</div>
                 </div>
               </div>
             </div>
@@ -121,22 +156,22 @@ export default function Home() {
           <div className="max-w-7xl mx-auto grid md:grid-cols-3 divide-y-2 md:divide-y-0 md:divide-x-2 divide-[#222]">
             {[
               {
-                title: "HYPER_CACHING",
-                desc: "Algoritmi di invalidazione granulare. Riduciamo il carico del DB fino al 90% con logica edge-first.",
+                title: "SMART_CACHING",
+                desc: "Identifica prompt identici e restituisci risposte cache. Risparmia fino al 40% su chiamate duplicate.",
                 tag: "01",
-                icon: <Box />
+                icon: <TrendingDown />
               },
               {
-                title: "THREAT_SHIELD",
-                desc: "Analisi euristica delle richieste in entrata. Protezione nativa contro DDoS, SQLi e Scraping.",
+                title: "COST_TRACKING",
+                desc: "Monitora costi real-time per modello e endpoint. Analytics granulari su ogni singola chiamata API.",
                 tag: "02",
-                icon: <Lock />
+                icon: <BarChart3 />
               },
               {
-                title: "ZERO_SLOP_LOGS",
-                desc: "Nessun dato inutile. Solo telemetria pura, filtrata e pronta per il debug in tempo reale.",
+                title: "ZERO_CONFIG",
+                desc: "Una sola riga di codice. Cambia solo l'URL base. Nessuna modifica alla logica esistente.",
                 tag: "03",
-                icon: <Terminal />
+                icon: <Zap />
               }
             ].map((f, i) => (
               <div key={i} className="p-12 hover:bg-[#151515] transition-colors group">
@@ -155,19 +190,56 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="pricing" className="bg-[#FFD700] py-12 px-6">
-          <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-8">
+        <section id="how-it-works" className="px-6 py-24 max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-black uppercase italic mb-4">Come Funziona</h2>
+            <p className="text-[#777] font-sans">Tre semplici passaggi per ridurre i costi</p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-8">
             {[
-              { label: "Richieste_Protette", val: "4.2B+" },
-              { label: "Calo_Latenza_Medio", val: "-38.4ms" },
-              { label: "Attacchi_Bloccati", val: "102k" },
-              { label: "Uptime_Garantito", val: "99.999%" }
-            ].map((m, i) => (
-              <div key={i} className="text-black">
-                <div className="text-[10px] font-black uppercase tracking-widest mb-1">{m.label}</div>
-                <div className="text-5xl font-black tracking-tighter italic leading-none">{m.val}</div>
+              { step: "01", title: "PROXY", desc: "Cambia l'URL base del tuo SDK OpenAI per puntare a TokenGuard" },
+              { step: "02", title: "LOG & CACHE", desc: "Ogni richiesta viene loggata con costo. Le duplicate vanno in cache automaticamente" },
+              { step: "03", title: "SAVE", desc: "Vedi analytics real-time e risparmia su ogni chiamata duplicata" }
+            ].map((item, i) => (
+              <div key={i} className="border-2 border-[#222] p-8 hover:border-[#FFD700]/50 transition-colors">
+                <div className="text-[#FFD700] font-black text-5xl mb-4">{item.step}</div>
+                <h3 className="text-xl font-black uppercase italic mb-3">{item.title}</h3>
+                <p className="text-[#777] font-sans text-sm">{item.desc}</p>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section className="bg-[#FFD700] py-12 px-6">
+          <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-8">
+            {loading ? (
+              <>
+                <div className="text-black">
+                  <div className="text-[10px] font-black uppercase tracking-widest mb-1">Loading...</div>
+                  <div className="text-5xl font-black tracking-tighter italic leading-none">---</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-black">
+                  <div className="text-[10px] font-black uppercase tracking-widest mb-1">Risparmio_Totale</div>
+                  <div className="text-5xl font-black tracking-tighter italic leading-none">${stats.totalSaved.toFixed(2)}</div>
+                </div>
+                <div className="text-black">
+                  <div className="text-[10px] font-black uppercase tracking-widest mb-1">Utenti_Attivi</div>
+                  <div className="text-5xl font-black tracking-tighter italic leading-none">{stats.activeUsers}</div>
+                </div>
+                <div className="text-black">
+                  <div className="text-[10px] font-black uppercase tracking-widest mb-1">Riduzione_Media</div>
+                  <div className="text-5xl font-black tracking-tighter italic leading-none">{stats.avgReduction}%</div>
+                </div>
+                <div className="text-black">
+                  <div className="text-[10px] font-black uppercase tracking-widest mb-1">Chiamate_Loggate</div>
+                  <div className="text-5xl font-black tracking-tighter italic leading-none">{stats.totalCalls.toLocaleString()}</div>
+                </div>
+              </>
+            )}
           </div>
         </section>
 
@@ -179,8 +251,8 @@ export default function Home() {
                 <span className="text-xl font-black italic uppercase tracking-tighter">TokenGuard</span>
               </div>
               <p className="text-[#555] text-xs font-sans max-w-sm mb-6">
-                L&apos;infrastruttura non deve essere bella, deve essere indistruttibile.
-                Sviluppato per chi gestisce sistemi mission-critical.
+                Monitora e riduci i costi delle tue API LLM. 
+                Caching intelligente, analytics real-time, zero configurazione.
               </p>
               <div className="flex gap-4">
                 <div className="w-8 h-8 bg-[#1A1A1A] border border-[#333] hover:border-[#FFD700] cursor-pointer" />
@@ -192,21 +264,21 @@ export default function Home() {
             <div className="space-y-4">
               <h4 className="text-[10px] font-black uppercase text-[#FFD700] tracking-widest">[ Risorse ]</h4>
               <ul className="text-[#777] text-xs space-y-2 uppercase font-bold">
-                <li><Link href="#" className="hover:text-white transition-colors">Documentazione_API</Link></li>
-                <li><Link href="#" className="hover:text-white transition-colors">SDK_React_Node</Link></li>
-                <li><Link href="#" className="hover:text-white transition-colors">Guide_Integrazione</Link></li>
+                <li><Link href="#" className="hover:text-white transition-colors">Documentazione</Link></li>
+                <li><Link href="#" className="hover:text-white transition-colors">API_Reference</Link></li>
+                <li><Link href="#" className="hover:text-white transition-colors">Integrazione</Link></li>
               </ul>
             </div>
 
             <div className="space-y-4">
-              <h4 className="text-[10px] font-black uppercase text-[#FFD700] tracking-widest">[ Stato_Sistema ]</h4>
+              <h4 className="text-[10px] font-black uppercase text-[#FFD700] tracking-widest">[ Stato ]</h4>
               <div className="flex items-center gap-2 text-xs text-green-500 font-bold">
                 <div className="w-2 h-2 bg-green-500 animate-pulse rounded-full" />
-                SISTEMI_OPERATIVI
+                OPERATIVO
               </div>
               <div className="text-[#333] text-[9px] font-mono leading-tight">
-                ULTIMO_AUDIT: MAR_2024<br />
-                VERSIONE: TG_CORE_V1.2
+                VERSIONE: TG_V1.0<br />
+                SUPABASE: CONNESSO
               </div>
             </div>
           </div>
