@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { 
+import {
   RefreshCw,
   Wallet,
   Activity,
   TrendingDown,
   Zap,
   LogOut,
-  BarChart3
+  BarChart3,
+  BookOpen
 } from 'lucide-react'
 
 interface ApiLog {
@@ -105,9 +106,9 @@ export default function DashboardPage() {
               </div>
               <span className="font-black tracking-tighter uppercase italic">TokenGuard</span>
             </div>
-            
+
             <div className="flex items-center gap-4">
-              <button 
+              <button
                 onClick={fetchDashboardData}
                 disabled={isLoading}
                 className={`p-2 hover:text-[#FFD700] transition ${isLoading ? 'animate-spin' : ''}`}
@@ -115,6 +116,9 @@ export default function DashboardPage() {
                 <RefreshCw size={18} />
               </button>
               <div className="h-6 w-px bg-[#222]" />
+              <Link href="/docs" className="p-2 hover:text-[#FFD700] transition" title="Documentazione & Integrazione">
+                <BookOpen size={18} />
+              </Link>
               <Link href="/" className="p-2 hover:text-[#FFD700] transition">
                 <LogOut size={18} />
               </Link>
@@ -132,7 +136,7 @@ export default function DashboardPage() {
             <p className="text-[#777] font-sans text-sm">Monitora i tuoi costi LLM in tempo reale</p>
           </div>
           <div className="flex items-center gap-3">
-            <select 
+            <select
               value={timeRange}
               onChange={(e) => setTimeRange(e.target.value)}
               className="px-4 py-2 bg-[#1A1A1A] border-2 border-[#222] text-sm focus:outline-none focus:border-[#FFD700] uppercase text-[10px] font-bold"
@@ -147,23 +151,23 @@ export default function DashboardPage() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatCard 
+          <StatCard
             title="TOTALE SPESO"
             value={isLoading ? '---' : `$${stats.totalSpent.toFixed(2)}`}
             icon={<Wallet size={20} />}
           />
-          <StatCard 
+          <StatCard
             title="TOKEN USATI"
             value={isLoading ? '---' : stats.totalTokens.toLocaleString()}
             icon={<Activity size={20} />}
           />
-          <StatCard 
+          <StatCard
             title="RISPARMIATO"
             value={isLoading ? '---' : `$${stats.costSaved.toFixed(2)}`}
             icon={<TrendingDown size={20} />}
             highlight
           />
-          <StatCard 
+          <StatCard
             title="CHIAMATE API"
             value={isLoading ? '---' : stats.totalRequests.toLocaleString()}
             subvalue={stats.cachedRequests > 0 ? `${stats.cachedRequests} in cache` : ''}
@@ -193,7 +197,7 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-4">
                 {Object.entries(modelStats)
-                  .sort(([,a], [,b]) => b - a)
+                  .sort(([, a], [, b]) => b - a)
                   .map(([model, cost]) => (
                     <div key={model}>
                       <div className="flex justify-between text-sm mb-2 font-bold uppercase">
@@ -201,7 +205,7 @@ export default function DashboardPage() {
                         <span className="text-[#FFD700]">${cost.toFixed(4)}</span>
                       </div>
                       <div className="w-full bg-[#222] h-2">
-                        <div 
+                        <div
                           className="bg-[#FFD700] h-2 transition-all"
                           style={{ width: `${Math.min((cost / (stats.totalSpent || 1)) * 100, 100)}%` }}
                         />
@@ -231,16 +235,16 @@ export default function DashboardPage() {
                 <div className="flex justify-between">
                   <span className="text-[#777]">Cache Hit Rate</span>
                   <span className="font-bold">
-                    {stats.totalRequests > 0 
-                      ? Math.round((stats.cachedRequests / stats.totalRequests) * 100) 
+                    {stats.totalRequests > 0
+                      ? Math.round((stats.cachedRequests / stats.totalRequests) * 100)
                       : 0}%
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#777]">Costo Medio/Call</span>
                   <span className="font-bold">
-                    ${stats.totalRequests > 0 
-                      ? (stats.totalSpent / stats.totalRequests).toFixed(4) 
+                    ${stats.totalRequests > 0
+                      ? (stats.totalSpent / stats.totalRequests).toFixed(4)
                       : '0.0000'}
                   </span>
                 </div>
@@ -261,7 +265,7 @@ export default function DashboardPage() {
               {logs.length} chiamate nel periodo
             </span>
           </div>
-          
+
           {isLoading ? (
             <div className="py-12 flex items-center justify-center">
               <RefreshCw className="animate-spin text-[#333]" size={32} />
@@ -302,11 +306,10 @@ export default function DashboardPage() {
                         ${log.cost_usd.toFixed(4)}
                       </td>
                       <td className="py-4 px-4">
-                        <span className={`text-[10px] font-bold uppercase px-2 py-1 ${
-                          log.cached 
-                            ? 'bg-[#FFD700]/20 text-[#FFD700]' 
-                            : 'bg-green-500/20 text-green-500'
-                        }`}>
+                        <span className={`text-[10px] font-bold uppercase px-2 py-1 ${log.cached
+                          ? 'bg-[#FFD700]/20 text-[#FFD700]'
+                          : 'bg-green-500/20 text-green-500'
+                          }`}>
                           {log.cached ? 'CACHED' : 'OK'}
                         </span>
                       </td>
@@ -322,7 +325,7 @@ export default function DashboardPage() {
   )
 }
 
-function StatCard({ title, value, subvalue, icon, highlight }: { 
+function StatCard({ title, value, subvalue, icon, highlight }: {
   title: string
   value: string
   subvalue?: string
