@@ -1,7 +1,5 @@
 'use client'
 
-'use client'
-
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
@@ -105,7 +103,7 @@ export default function Home() {
               Riduci i costi <br /> <span className="text-[#FFD700]">LLM del 30-50%</span>
             </h1>
             <p className="font-sans text-lg text-[#AAA] max-w-md mb-10 leading-snug">
-              TokenGuard si posiziona tra la tua app e OpenAI/Anthropic. Logga ogni chiamata, 
+              TokenGuard si posiziona tra la tua app e OpenAI/Anthropic. Logga ogni chiamata,
               cache le duplicate e ti mostra esattamente dove vai a spendere.
             </p>
 
@@ -195,7 +193,7 @@ export default function Home() {
             <h2 className="text-4xl font-black uppercase italic mb-4">Come Funziona</h2>
             <p className="text-[#777] font-sans">Tre semplici passaggi per ridurre i costi</p>
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-8">
             {[
               { step: "01", title: "PROXY", desc: "Cambia l'URL base del tuo SDK OpenAI per puntare a TokenGuard" },
@@ -251,7 +249,7 @@ export default function Home() {
                 <span className="text-xl font-black italic uppercase tracking-tighter">TokenGuard</span>
               </div>
               <p className="text-[#555] text-xs font-sans max-w-sm mb-6">
-                Monitora e riduci i costi delle tue API LLM. 
+                Monitora e riduci i costi delle tue API LLM.
                 Caching intelligente, analytics real-time, zero configurazione.
               </p>
               <div className="flex gap-4">

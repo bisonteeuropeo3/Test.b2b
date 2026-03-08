@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-const supabaseAdmin = supabaseUrl && supabaseKey 
+const supabaseAdmin = supabaseUrl && supabaseKey
   ? createClient(supabaseUrl, supabaseKey)
   : null
 
@@ -13,9 +13,58 @@ const supabaseAdmin = supabaseUrl && supabaseKey
 const requestCache = new Map<string, { response: any; timestamp: number }>()
 const CACHE_TTL = 60000 // 1 minute
 
+// CORS headers for external API access
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-TokenGuard-Key',
+  'Access-Control-Max-Age': '86400',
+}
+
+// Handle CORS preflight requests (needed for external API calls)
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders,
+  })
+}
+
+// Handle GET requests (e.g., /v1/models listing)
+export async function GET(request: NextRequest) {
+  const apiKey = request.headers.get('authorization')?.replace('Bearer ', '')
+
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: 'Missing OpenAI API key in Authorization header' },
+      { status: 401, headers: corsHeaders }
+    )
+  }
+
+  try {
+    // Forward GET request to OpenAI (e.g., /v1/models)
+    const openaiResponse = await fetch('https://api.openai.com/v1/models', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+      },
+    })
+
+    const data = await openaiResponse.json()
+    return NextResponse.json(data, {
+      status: openaiResponse.status,
+      headers: corsHeaders
+    })
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to reach OpenAI', message: (error as Error).message },
+      { status: 502, headers: corsHeaders }
+    )
+  }
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
-  
+
   try {
     const body = await request.json()
     const apiKey = request.headers.get('authorization')?.replace('Bearer ', '')
@@ -23,23 +72,41 @@ export async function POST(request: NextRequest) {
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'Missing OpenAI API key' },
-        { status: 401 }
+        {
+          error: {
+            message: 'Missing OpenAI API key. Pass it via Authorization: Bearer YOUR_KEY',
+            type: 'authentication_error',
+            code: 'missing_api_key'
+          }
+        },
+        { status: 401, headers: corsHeaders }
       )
     }
 
     if (!tokenGuardKey) {
       return NextResponse.json(
-        { error: 'Missing TokenGuard API key. Add X-TokenGuard-Key header' },
-        { status: 401 }
+        {
+          error: {
+            message: 'Missing TokenGuard API key. Add the header: X-TokenGuard-Key: YOUR_TG_KEY',
+            type: 'authentication_error',
+            code: 'missing_tokenguard_key'
+          }
+        },
+        { status: 401, headers: corsHeaders }
       )
     }
 
     // Check if Supabase is configured
     if (!supabaseAdmin) {
       return NextResponse.json(
-        { error: 'Server configuration error. Please check environment variables.' },
-        { status: 500 }
+        {
+          error: {
+            message: 'Server not configured. Supabase environment variables are missing.',
+            type: 'server_error',
+            code: 'missing_config'
+          }
+        },
+        { status: 500, headers: corsHeaders }
       )
     }
 
@@ -52,15 +119,21 @@ export async function POST(request: NextRequest) {
 
     if (userError || !userData) {
       return NextResponse.json(
-        { error: 'Invalid TokenGuard API key' },
-        { status: 401 }
+        {
+          error: {
+            message: 'Invalid TokenGuard API key. Check your X-TokenGuard-Key header.',
+            type: 'authentication_error',
+            code: 'invalid_tokenguard_key'
+          }
+        },
+        { status: 401, headers: corsHeaders }
       )
     }
 
     // Generate prompt hash for duplicate detection
     const promptHash = generatePromptHash(body)
     const cacheKey = `${userData.id}:${promptHash}`
-    
+
     // Check cache for duplicate
     const cached = requestCache.get(cacheKey)
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
@@ -81,7 +154,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         ...cached.response,
         _tokenguard: { cached: true, saved: true }
-      })
+      }, { headers: corsHeaders })
     }
 
     // Forward request to OpenAI
@@ -96,7 +169,10 @@ export async function POST(request: NextRequest) {
 
     if (!openaiResponse.ok) {
       const error = await openaiResponse.json()
-      return NextResponse.json(error, { status: openaiResponse.status })
+      return NextResponse.json(error, {
+        status: openaiResponse.status,
+        headers: corsHeaders
+      })
     }
 
     const data = await openaiResponse.json()
@@ -125,24 +201,33 @@ export async function POST(request: NextRequest) {
     // Cache the response
     requestCache.set(cacheKey, { response: data, timestamp: Date.now() })
 
+    // Clean old cache entries (prevent memory leak)
+    cleanCache()
+
     // Check budget alert
     await checkBudgetAlert(userData.id, userData.monthly_budget)
 
     return NextResponse.json({
       ...data,
-      _tokenguard: { 
-        logged: true, 
+      _tokenguard: {
+        logged: true,
         cost,
         latency,
-        cached: false 
+        cached: false
       }
-    })
+    }, { headers: corsHeaders })
 
   } catch (error) {
     console.error('Proxy error:', error)
     return NextResponse.json(
-      { error: 'Internal server error', message: (error as Error).message },
-      { status: 500 }
+      {
+        error: {
+          message: `Proxy error: ${(error as Error).message}`,
+          type: 'server_error',
+          code: 'proxy_error'
+        }
+      },
+      { status: 500, headers: corsHeaders }
     )
   }
 }
@@ -163,17 +248,29 @@ function calculateCost(model: string, promptTokens: number, completionTokens: nu
     'gpt-4': { prompt: 0.03, completion: 0.06 },
     'gpt-4-turbo': { prompt: 0.01, completion: 0.03 },
     'gpt-4-turbo-preview': { prompt: 0.01, completion: 0.03 },
+    'gpt-4o': { prompt: 0.005, completion: 0.015 },
+    'gpt-4o-mini': { prompt: 0.00015, completion: 0.0006 },
     'gpt-3.5-turbo': { prompt: 0.0015, completion: 0.002 },
     'gpt-3.5-turbo-1106': { prompt: 0.001, completion: 0.002 },
     'gpt-3.5-turbo-0125': { prompt: 0.0005, completion: 0.0015 },
   }
 
   const modelPricing = pricing[model] || pricing['gpt-3.5-turbo']
-  
+
   return Number((
     (promptTokens / 1000) * modelPricing.prompt +
     (completionTokens / 1000) * modelPricing.completion
   ).toFixed(6))
+}
+
+function cleanCache() {
+  const now = Date.now()
+  const entries = Array.from(requestCache.entries())
+  entries.forEach(([key, value]) => {
+    if (now - value.timestamp > CACHE_TTL * 5) {
+      requestCache.delete(key)
+    }
+  })
 }
 
 async function logRequest(params: {
@@ -225,7 +322,7 @@ async function checkBudgetAlert(userId: string, monthlyBudget: number) {
       .eq('user_id', userId)
       .gte('created_at', startOfMonth.toISOString())
 
-    const totalSpent = logs?.reduce((sum, log) => sum + (log.cost_usd || 0), 0) || 0
+    const totalSpent = logs?.reduce((sum: number, log: Record<string, number>) => sum + ((log.cost_usd as number) || 0), 0) || 0
     const percentage = (totalSpent / monthlyBudget) * 100
 
     // Check if we should send alert (80% threshold)

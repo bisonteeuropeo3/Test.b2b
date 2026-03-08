@@ -389,6 +389,20 @@ response = client.chat.completions.create(
                             </div>
                         </section>
 
+                        {/* Health Check */}
+                        <section className="border-2 border-green-500/30 bg-[#111] p-8">
+                            <h2 className="text-xl font-black uppercase italic mb-4 flex items-center gap-3">
+                                <div className="w-3 h-3 bg-green-500 animate-pulse" /> Test Connettività
+                            </h2>
+                            <p className="text-[#777] font-sans text-sm mb-6">Prima di iniziare, verifica che il tuo setup sia corretto</p>
+                            <CodeBlock code={`# Test senza autenticazione (verifica che il servizio sia online)
+curl ${baseUrl.replace('/proxy/openai', '/health')}
+
+# Test con la tua API key (verifica autenticazione)
+curl ${baseUrl.replace('/proxy/openai', '/health')} \\
+  -H "X-TokenGuard-Key: ${apiKey}"`} index={7} copiedIndex={copiedIndex} onCopy={copyToClipboard} />
+                        </section>
+
                         {/* cURL Example */}
                         <section className="border-2 border-[#222] bg-[#111] p-8">
                             <h2 className="text-xl font-black uppercase italic mb-4">Esempio cURL</h2>
@@ -450,6 +464,8 @@ response = client.chat.completions.create(
                                         {[
                                             { model: 'gpt-4', input: '$0.03', output: '$0.06' },
                                             { model: 'gpt-4-turbo', input: '$0.01', output: '$0.03' },
+                                            { model: 'gpt-4o', input: '$0.005', output: '$0.015' },
+                                            { model: 'gpt-4o-mini', input: '$0.00015', output: '$0.0006' },
                                             { model: 'gpt-3.5-turbo', input: '$0.0015', output: '$0.002' },
                                             { model: 'gpt-3.5-turbo-0125', input: '$0.0005', output: '$0.0015' },
                                         ].map((row) => (
