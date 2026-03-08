@@ -13,7 +13,7 @@ function generateApiKey(): string {
     return result
 }
 
-// GET: List all API keys for the authenticated user
+// GET: List all API keys
 export async function GET() {
     if (!supabaseUrl || !supabaseKey) {
         return NextResponse.json({ keys: [], message: 'Supabase not configured' })
@@ -22,27 +22,28 @@ export async function GET() {
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     try {
-        const { data: profiles, error } = await supabase
-            .from('profiles')
-            .select('id, api_key, email, created_at, updated_at')
-            .not('api_key', 'is', null)
-            .limit(10)
+        // Leggi dalla tabella api_keys (NON profiles)
+        const { data: keys, error } = await supabase
+            .from('api_keys')
+            .select('id, api_key, label, email, plan, is_active, created_at, last_used_at')
+            .order('created_at', { ascending: false })
+            .limit(50)
 
         if (error) {
             console.error('Error fetching keys:', error)
             return NextResponse.json({ keys: [], error: error.message })
         }
 
-        const keys = (profiles || []).map((p: Record<string, string>) => ({
-            id: p.id,
-            key: p.api_key,
-            label: p.email || 'Chiave API',
-            created: p.created_at,
-            lastUsed: p.updated_at,
-            isActive: true
+        const formattedKeys = (keys || []).map((k: Record<string, string | boolean | null>) => ({
+            id: k.id,
+            key: k.api_key,
+            label: k.label || 'Chiave API',
+            created: k.created_at,
+            lastUsed: k.last_used_at,
+            isActive: k.is_active !== false
         }))
 
-        return NextResponse.json({ keys })
+        return NextResponse.json({ keys: formattedKeys })
     } catch (error) {
         console.error('Error in settings/keys GET:', error)
         return NextResponse.json({ keys: [], error: 'Server error' })
@@ -51,12 +52,12 @@ export async function GET() {
 
 // POST: Generate a new API key
 export async function POST(request: NextRequest) {
+    const newKey = generateApiKey()
+
     if (!supabaseUrl || !supabaseKey) {
-        // Fallback: generate key locally
-        const key = generateApiKey()
         return NextResponse.json({
             id: crypto.randomUUID(),
-            apiKey: key,
+            apiKey: newKey,
             message: 'Generated locally (Supabase not configured)'
         })
     }
@@ -67,41 +68,39 @@ export async function POST(request: NextRequest) {
         const body = await request.json()
         const { label } = body
 
-        const newKey = generateApiKey()
-
-        // Try to create a new profile entry or update existing
+        // Inserisce nella tabella api_keys (NON profiles)
         const { data, error } = await supabase
-            .from('profiles')
+            .from('api_keys')
             .insert({
-                email: label || 'unnamed-key',
                 api_key: newKey,
+                label: label || 'Nuova Chiave',
                 plan: 'free',
                 monthly_budget: 100,
+                is_active: true,
             })
             .select('id, api_key')
             .single()
 
         if (error) {
-            console.error('Error creating key:', error)
-            // Return the key anyway (generated locally)
+            console.error('Error creating key in DB:', error)
+            // Restituisci la chiave anche se il DB fallisce
             return NextResponse.json({
                 id: crypto.randomUUID(),
                 apiKey: newKey,
-                message: 'Key generated (DB insert failed: ' + error.message + ')'
+                message: 'Key generated but DB insert failed: ' + error.message
             })
         }
 
         return NextResponse.json({
             id: data?.id,
             apiKey: data?.api_key || newKey,
-            message: 'API key generated successfully'
+            message: 'API key generated and saved to database'
         })
     } catch (error) {
         console.error('Error in settings/keys POST:', error)
-        const key = generateApiKey()
         return NextResponse.json({
             id: crypto.randomUUID(),
-            apiKey: key,
+            apiKey: newKey,
             message: 'Generated locally due to error'
         })
     }
@@ -119,11 +118,11 @@ export async function DELETE(request: NextRequest) {
         const body = await request.json()
         const { id, key } = body
 
+        // Disattiva nella tabella api_keys (NON profiles)
         if (id) {
-            // Nullify the API key in the profile (don't delete the profile)
             const { error } = await supabase
-                .from('profiles')
-                .update({ api_key: null })
+                .from('api_keys')
+                .update({ is_active: false })
                 .eq('id', id)
 
             if (error) {
@@ -131,8 +130,8 @@ export async function DELETE(request: NextRequest) {
             }
         } else if (key) {
             const { error } = await supabase
-                .from('profiles')
-                .update({ api_key: null })
+                .from('api_keys')
+                .update({ is_active: false })
                 .eq('api_key', key)
 
             if (error) {

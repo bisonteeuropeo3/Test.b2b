@@ -44,21 +44,39 @@ export async function GET(request: NextRequest) {
         const supabase = createClient(supabaseUrl, supabaseKey)
 
         try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('id, email, plan')
+            // Check api_keys table first
+            const { data: apiKeyData } = await supabase
+                .from('api_keys')
+                .select('id, label, plan, is_active')
                 .eq('api_key', tokenGuardKey)
+                .eq('is_active', true)
                 .single()
 
-            if (error || !data) {
-                result.authenticated = false
-                result.keyError = 'Invalid API key'
-            } else {
+            if (apiKeyData) {
                 result.authenticated = true
                 result.user = {
-                    id: data.id,
-                    email: data.email,
-                    plan: data.plan,
+                    id: apiKeyData.id,
+                    label: apiKeyData.label,
+                    plan: apiKeyData.plan,
+                }
+            } else {
+                // Fallback: check profiles table
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('id, email, plan')
+                    .eq('api_key', tokenGuardKey)
+                    .single()
+
+                if (profileData) {
+                    result.authenticated = true
+                    result.user = {
+                        id: profileData.id,
+                        email: profileData.email,
+                        plan: profileData.plan,
+                    }
+                } else {
+                    result.authenticated = false
+                    result.keyError = 'API key not found. It will be auto-registered on first proxy request.'
                 }
             }
         } catch {

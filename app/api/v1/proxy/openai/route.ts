@@ -110,25 +110,78 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate API key and get user
-    const { data: userData, error: userError } = await supabaseAdmin
-      .from('profiles')
-      .select('id, monthly_budget')
+    // Validate API key — check api_keys table first, then profiles as fallback
+    let userId: string | null = null
+    let monthlyBudget = 100
+
+    // 1. Check api_keys table (standalone keys)
+    const { data: apiKeyEntry } = await supabaseAdmin
+      .from('api_keys')
+      .select('id, monthly_budget, is_active')
       .eq('api_key', tokenGuardKey)
+      .eq('is_active', true)
       .single()
 
-    if (userError || !userData) {
+    if (apiKeyEntry) {
+      userId = apiKeyEntry.id
+      monthlyBudget = apiKeyEntry.monthly_budget || 100
+      // Update last_used_at
+      supabaseAdmin.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', apiKeyEntry.id).then(() => { })
+    } else {
+      // 2. Fallback: check profiles table (for keys created via Supabase Auth)
+      const { data: profileEntry } = await supabaseAdmin
+        .from('profiles')
+        .select('id, monthly_budget')
+        .eq('api_key', tokenGuardKey)
+        .single()
+
+      if (profileEntry) {
+        userId = profileEntry.id
+        monthlyBudget = profileEntry.monthly_budget || 100
+      } else {
+        // 3. Key not found anywhere — auto-register in api_keys table
+        console.log('Auto-registering new API key:', tokenGuardKey.substring(0, 12) + '...')
+
+        const { data: newKey, error: insertError } = await supabaseAdmin
+          .from('api_keys')
+          .insert({
+            api_key: tokenGuardKey,
+            label: 'Auto-registered',
+            plan: 'free',
+            monthly_budget: 100,
+            is_active: true,
+          })
+          .select('id')
+          .single()
+
+        if (insertError || !newKey) {
+          console.error('Failed to auto-register key:', insertError?.message)
+          return NextResponse.json(
+            {
+              error: {
+                message: 'Could not validate or register API key. Please run the migration 003_standalone_api_keys.sql in Supabase, then try again. Error: ' + (insertError?.message || 'unknown'),
+                type: 'authentication_error',
+                code: 'key_registration_failed'
+              }
+            },
+            { status: 401, headers: corsHeaders }
+          )
+        }
+
+        userId = newKey.id
+        console.log('Auto-registered key with id:', newKey.id)
+      }
+    }
+
+    // Safety check
+    if (!userId) {
       return NextResponse.json(
-        {
-          error: {
-            message: 'Invalid TokenGuard API key. Check your X-TokenGuard-Key header.',
-            type: 'authentication_error',
-            code: 'invalid_tokenguard_key'
-          }
-        },
+        { error: { message: 'Authentication failed', type: 'authentication_error', code: 'no_user' } },
         { status: 401, headers: corsHeaders }
       )
     }
+
+    const userData = { id: userId, monthly_budget: monthlyBudget }
 
     // Generate prompt hash for duplicate detection
     const promptHash = generatePromptHash(body)
