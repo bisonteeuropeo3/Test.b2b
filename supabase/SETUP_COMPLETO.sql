@@ -27,16 +27,15 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 --     NON preoccuparti: verranno ricreate subito dopo.
 -- ────────────────────────────────────────────────────────────
 
--- Prima rimuovi tabelle con FK (ordine di dipendenza)
+-- Prima rimuovi funzioni/trigger (CASCADE rimuove i trigger associati)
+DROP FUNCTION IF EXISTS set_api_key_on_insert() CASCADE;
+DROP FUNCTION IF EXISTS generate_api_key() CASCADE;
+
+-- Poi rimuovi tabelle con FK (ordine di dipendenza)
 DROP TABLE IF EXISTS public.budget_alerts CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
 -- NON droppiamo api_logs perchè non ha FK problematiche
 -- NON droppiamo api_keys perchè potrebbe non esistere ancora
-
--- Rimuovi vecchi trigger se esistono
-DROP TRIGGER IF EXISTS trigger_set_api_key ON public.profiles;
-DROP FUNCTION IF EXISTS set_api_key_on_insert();
-DROP FUNCTION IF EXISTS generate_api_key();
 
 
 -- ────────────────────────────────────────────────────────────
