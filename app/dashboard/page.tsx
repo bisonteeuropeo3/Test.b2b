@@ -7,7 +7,6 @@ import {
   TrendingUp, 
   AlertCircle,
   Activity,
-  Users,
   Zap,
   Settings
 } from 'lucide-react'
