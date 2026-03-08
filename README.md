@@ -29,7 +29,7 @@ npm install
 
 # Configura variabili d'ambiente
 cp .env.example .env.local
-# Modifica .env.local con i tuoi valori
+# Modifica .env.local con i tuoi valori (vedi sotto)
 
 # Avvia in locale
 npm run dev
@@ -41,15 +41,15 @@ Crea un file `.env.local` con:
 
 ```env
 # Supabase
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+NEXT_PUBLIC_SUPABASE_URL=https://djqtrggbnomhpjfkxjoo.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqcXRyZ2dibm9taHBqZmt4am9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5NzQzMzAsImV4cCI6MjA4ODU1MDMzMH0.gk8MwBwIB3NQ6xR1As_DZr4Xd8FShuN-Obtwat7cYPg
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqcXRyZ2dibm9taHBqZmt4am9vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Mjk3NDMzMCwiZXhwIjoyMDg4NTUwMzMwfQ.2C0x9CYWWqzieiibsw16MTRjQA9sEsJPoQjBG6C0Pks
 
 # App
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-**⚠️ IMPORTANTE:** Non committare mai `.env.local` o file con segreti!
+**⚠️ IMPORTANTE:** Non committare mai `.env.local` o file con segreti! Il file è già nel `.gitignore`.
 
 ## 🌐 Deploy su Vercel
 
@@ -66,17 +66,19 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 1. Nel progetto Vercel, vai su **Settings → Git**
 2. In **"Production Branch"** imposta: `sughifabre`
-3. In **"Deploy Hooks"** puoi creare un hook per deploy manuali
-4. Salva le modifiche
+3. Salva le modifiche
 
-### Variabili d'Ambiente su Vercel
+### Variabili d'Ambiente su Vercel (IMPORTANTE!)
 
 1. Vai su **Settings → Environment Variables**
-2. Aggiungi tutte le variabili da `.env.example`:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `NEXT_PUBLIC_APP_URL` (usa l'URL di Vercel)
+2. Aggiungi queste 3 variabili:
+
+| Nome | Valore |
+|------|--------|
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://djqtrggbnomhpjfkxjoo.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqcXRyZ2dibm9taHBqZmt4am9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5NzQzMzAsImV4cCI6MjA4ODU1MDMzMH0.gk8MwBwIB3NQ6xR1As_DZr4Xd8FShuN-Obtwat7cYPg` |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqcXRyZ2dibm9taHBqZmt4am9vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Mjk3NDMzMCwiZXhwIjoyMDg4NTUwMzMwfQ.2C0x9CYWWqzieiibsw16MTRjQA9sEsJPoQjBG6C0Pks` |
+
 3. Clicca **Save**
 
 ### Deploy Automatico
@@ -106,6 +108,13 @@ sughifabre (deploy/production)
 - `chore: manutenzione/deps`
 - `docs: documentazione`
 - `test: test`
+
+## 🗄️ Setup Database Supabase
+
+1. Vai su [supabase.com](https://supabase.com) → SQL Editor
+2. Crea una **New Query**
+3. Incolla il contenuto di `supabase/migrations/001_initial_schema.sql`
+4. Clicca **Run**
 
 ## 🧪 CI/CD
 
