@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Eye, EyeOff } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, Loader2 } from 'lucide-react'
 
 const GuardIcon = () => (
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="square" strokeLinejoin="miter">
@@ -14,11 +14,48 @@ const GuardIcon = () => (
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
   const [formData, setFormData] = useState({ email: '', password: '' })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    window.location.href = '/dashboard'
+    setIsLoading(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'Email o password non corretti')
+        setIsLoading(false)
+        return
+      }
+
+      // Save session to localStorage
+      if (data.session) {
+        localStorage.setItem('supabase_session', JSON.stringify(data.session))
+      }
+      if (data.user) {
+        localStorage.setItem('tokenguard_user_id', data.user.id)
+      }
+
+      // Redirect to dashboard
+      window.location.href = '/dashboard'
+    } catch (err) {
+      console.error('Login error:', err)
+      setError('Errore di connessione. Riprova più tardi.')
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -34,6 +71,13 @@ export default function LoginPage() {
           <h1 className="text-3xl font-black uppercase italic mb-2">Accedi</h1>
           <p className="text-[#777] font-sans">Entra nella console TokenGuard</p>
         </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-500/10 border-2 border-red-500/30 text-red-400 text-sm">
+            {error}
+          </div>
+        )}
 
         <div className="border-2 border-[#222] bg-[#111] p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -76,9 +120,21 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="w-full py-4 bg-[#FFD700] text-black font-black uppercase flex items-center justify-center gap-2 hover:translate-x-1 hover:-translate-y-1 transition-transform shadow-[4px_4px_0px_0px_rgba(255,215,0,0.2)]"
+              disabled={isLoading}
+              className={`w-full py-4 font-black uppercase flex items-center justify-center gap-2 transition-transform shadow-[4px_4px_0px_0px_rgba(255,215,0,0.2)] ${isLoading
+                  ? 'bg-[#333] text-[#666] cursor-wait'
+                  : 'bg-[#FFD700] text-black hover:translate-x-1 hover:-translate-y-1'
+                }`}
             >
-              Accedi <ArrowRight size={18} />
+              {isLoading ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" /> Accesso...
+                </>
+              ) : (
+                <>
+                  Accedi <ArrowRight size={18} />
+                </>
+              )}
             </button>
           </form>
 

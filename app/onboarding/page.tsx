@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Copy, Check, Key, Code, Terminal } from 'lucide-react'
+import { ArrowRight, Copy, Check, Key, Code, Terminal, AlertCircle } from 'lucide-react'
 
 const GuardIcon = () => (
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="square" strokeLinejoin="miter">
@@ -16,7 +16,21 @@ export default function OnboardingPage() {
   const router = useRouter()
   const [step, setStep] = useState(1)
   const [copied, setCopied] = useState(false)
-  const [apiKey] = useState('tg_live_' + Math.random().toString(36).substring(2, 30))
+  const [apiKey, setApiKey] = useState('')
+  const [hasKey, setHasKey] = useState(false)
+
+  useEffect(() => {
+    // Retrieve the API key from localStorage (set during signup)
+    const savedKey = localStorage.getItem('tokenguard_api_key')
+    if (savedKey) {
+      setApiKey(savedKey)
+      setHasKey(true)
+    } else {
+      // If no key found, redirect to signup
+      setApiKey('Nessuna chiave trovata. Registrati prima.')
+      setHasKey(false)
+    }
+  }, [])
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -50,11 +64,10 @@ export default function OnboardingPage() {
           {steps.map((s, i) => (
             <div key={s.id} className="flex items-center flex-1">
               <div className="flex flex-col items-center">
-                <div className={`w-12 h-12 flex items-center justify-center font-black text-lg ${
-                  step > s.id ? 'bg-green-500 text-black' : 
-                  step === s.id ? 'bg-[#FFD700] text-black' : 
-                  'bg-[#222] text-[#555]'
-                }`}>
+                <div className={`w-12 h-12 flex items-center justify-center font-black text-lg ${step > s.id ? 'bg-green-500 text-black' :
+                    step === s.id ? 'bg-[#FFD700] text-black' :
+                      'bg-[#222] text-[#555]'
+                  }`}>
                   {step > s.id ? <Check size={20} /> : s.id}
                 </div>
                 <span className="text-[10px] font-black uppercase mt-2 text-[#777]">{s.title}</span>
@@ -75,31 +88,60 @@ export default function OnboardingPage() {
                   <Key className="w-8 h-8 text-[#FFD700]" />
                 </div>
                 <h2 className="text-2xl font-black uppercase italic mb-2">La tua API Key</h2>
-                <p className="text-[#777] font-sans">Copia questa chiave e conservala in sicurezza</p>
-              </div>
-
-              <div className="bg-[#0F0F0F] border-2 border-[#222] p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <code className="text-[#FFD700] text-sm break-all font-mono">{apiKey}</code>
-                  <button
-                    onClick={() => copyToClipboard(apiKey)}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#222] hover:bg-[#333] transition shrink-0 text-sm font-bold uppercase"
-                  >
-                    {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
-                    {copied ? 'Copiato' : 'Copia'}
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-amber-500/10 border-2 border-amber-500/20 p-4">
-                <p className="text-amber-400 text-sm font-sans">
-                  <strong className="font-bold uppercase">Sicurezza:</strong> Salva questa chiave nelle variabili d&apos;ambiente, non committarla mai.
+                <p className="text-[#777] font-sans">
+                  {hasKey
+                    ? 'Copia questa chiave e conservala in sicurezza'
+                    : 'Nessuna chiave trovata'}
                 </p>
               </div>
 
+              {!hasKey ? (
+                <div className="bg-red-500/10 border-2 border-red-500/30 p-4 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-red-400 text-sm font-bold uppercase">Chiave non trovata</p>
+                    <p className="text-red-400/70 text-sm mt-1">
+                      Sembra che tu non abbia completato la registrazione.
+                      <a href="/signup" className="underline ml-1">Registrati qui</a>.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-[#0F0F0F] border-2 border-[#222] p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <code className="text-[#FFD700] text-sm break-all font-mono">{apiKey}</code>
+                      <button
+                        onClick={() => copyToClipboard(apiKey)}
+                        className="flex items-center gap-2 px-4 py-2 bg-[#222] hover:bg-[#333] transition shrink-0 text-sm font-bold uppercase"
+                      >
+                        {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
+                        {copied ? 'Copiato' : 'Copia'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-green-500/10 border-2 border-green-500/20 p-4">
+                    <p className="text-green-400 text-sm font-sans">
+                      <strong className="font-bold uppercase">✅ Salvata su Supabase:</strong> La tua chiave è stata generata e salvata nel database.
+                    </p>
+                  </div>
+
+                  <div className="bg-amber-500/10 border-2 border-amber-500/20 p-4">
+                    <p className="text-amber-400 text-sm font-sans">
+                      <strong className="font-bold uppercase">Sicurezza:</strong> Salva questa chiave nelle variabili d&apos;ambiente, non committarla mai.
+                    </p>
+                  </div>
+                </>
+              )}
+
               <button
                 onClick={() => setStep(2)}
-                className="w-full py-4 bg-[#FFD700] text-black font-black uppercase flex items-center justify-center gap-2 hover:translate-x-1 hover:-translate-y-1 transition-transform shadow-[4px_4px_0px_0px_rgba(255,215,0,0.2)]"
+                disabled={!hasKey}
+                className={`w-full py-4 font-black uppercase flex items-center justify-center gap-2 transition-transform shadow-[4px_4px_0px_0px_rgba(255,215,0,0.2)] ${hasKey
+                    ? 'bg-[#FFD700] text-black hover:translate-x-1 hover:-translate-y-1'
+                    : 'bg-[#333] text-[#666] cursor-not-allowed'
+                  }`}
               >
                 Continua <ArrowRight size={18} />
               </button>

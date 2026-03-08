@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Eye, EyeOff, Check } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, Check, Loader2 } from 'lucide-react'
 
 const GuardIcon = () => (
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="square" strokeLinejoin="miter">
@@ -15,6 +15,8 @@ const GuardIcon = () => (
 export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [step, setStep] = useState(1)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -22,10 +24,52 @@ export default function SignupPage() {
     monthlyBudget: '100'
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    window.location.href = '/onboarding'
+    setIsLoading(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          companyName: formData.companyName,
+          monthlyBudget: formData.monthlyBudget,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'Errore nella registrazione')
+        setIsLoading(false)
+        return
+      }
+
+      // Save session info to localStorage for use in onboarding/dashboard
+      if (data.session) {
+        localStorage.setItem('supabase_session', JSON.stringify(data.session))
+      }
+      if (data.apiKey) {
+        localStorage.setItem('tokenguard_api_key', data.apiKey)
+      }
+      if (data.userId) {
+        localStorage.setItem('tokenguard_user_id', data.userId)
+      }
+
+      // Redirect to onboarding
+      window.location.href = '/onboarding'
+    } catch (err) {
+      console.error('Signup error:', err)
+      setError('Errore di connessione. Riprova più tardi.')
+      setIsLoading(false)
+    }
   }
+
+  const canProceedStep1 = formData.email.length > 0 && formData.password.length >= 8
 
   return (
     <div className="min-h-screen bg-[#0F0F0F] text-[#E0E0E0] font-mono flex items-center justify-center px-4">
@@ -46,16 +90,22 @@ export default function SignupPage() {
           {[1, 2, 3].map((s) => (
             <div
               key={s}
-              className={`w-10 h-10 flex items-center justify-center font-black text-sm ${
-                s === step ? 'bg-[#FFD700] text-black' : 
-                s < step ? 'bg-green-500 text-black' : 
-                'bg-[#222] text-[#555]'
-              }`}
+              className={`w-10 h-10 flex items-center justify-center font-black text-sm ${s === step ? 'bg-[#FFD700] text-black' :
+                  s < step ? 'bg-green-500 text-black' :
+                    'bg-[#222] text-[#555]'
+                }`}
             >
               {s < step ? <Check size={18} /> : s}
             </div>
           ))}
         </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-500/10 border-2 border-red-500/30 text-red-400 text-sm">
+            {error}
+          </div>
+        )}
 
         <div className="border-2 border-[#222] bg-[#111] p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -97,12 +147,19 @@ export default function SignupPage() {
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
+                  {formData.password.length > 0 && formData.password.length < 8 && (
+                    <p className="text-red-400 text-xs mt-1">La password deve avere almeno 8 caratteri</p>
+                  )}
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => setStep(2)}
-                  className="w-full py-4 bg-[#FFD700] text-black font-black uppercase flex items-center justify-center gap-2 hover:translate-x-1 hover:-translate-y-1 transition-transform shadow-[4px_4px_0px_0px_rgba(255,215,0,0.2)]"
+                  onClick={() => { setError(''); setStep(2) }}
+                  disabled={!canProceedStep1}
+                  className={`w-full py-4 font-black uppercase flex items-center justify-center gap-2 transition-transform shadow-[4px_4px_0px_0px_rgba(255,215,0,0.2)] ${canProceedStep1
+                      ? 'bg-[#FFD700] text-black hover:translate-x-1 hover:-translate-y-1'
+                      : 'bg-[#333] text-[#666] cursor-not-allowed'
+                    }`}
                 >
                   Continua <ArrowRight size={18} />
                 </button>
@@ -117,11 +174,10 @@ export default function SignupPage() {
                   </label>
                   <input
                     type="text"
-                    required
                     value={formData.companyName}
                     onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
                     className="w-full px-4 py-3 bg-[#0F0F0F] border-2 border-[#222] text-white focus:outline-none focus:border-[#FFD700] transition font-mono"
-                    placeholder="Mia Azienda"
+                    placeholder="Mia Azienda (opzionale)"
                   />
                 </div>
 
@@ -144,14 +200,14 @@ export default function SignupPage() {
                 <div className="flex gap-3">
                   <button
                     type="button"
-                    onClick={() => setStep(1)}
+                    onClick={() => { setError(''); setStep(1) }}
                     className="flex-1 py-4 border-2 border-[#222] font-black uppercase hover:bg-[#222] transition"
                   >
                     Indietro
                   </button>
                   <button
                     type="button"
-                    onClick={() => setStep(3)}
+                    onClick={() => { setError(''); setStep(3) }}
                     className="flex-1 py-4 bg-[#FFD700] text-black font-black uppercase flex items-center justify-center gap-2 hover:translate-x-1 hover:-translate-y-1 transition-transform shadow-[4px_4px_0px_0px_rgba(255,215,0,0.2)]"
                   >
                     Continua <ArrowRight size={18} />
@@ -190,16 +246,29 @@ export default function SignupPage() {
                 <div className="flex gap-3">
                   <button
                     type="button"
-                    onClick={() => setStep(2)}
+                    onClick={() => { setError(''); setStep(2) }}
+                    disabled={isLoading}
                     className="flex-1 py-4 border-2 border-[#222] font-black uppercase hover:bg-[#222] transition"
                   >
                     Indietro
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-4 bg-[#FFD700] text-black font-black uppercase flex items-center justify-center gap-2 hover:translate-x-1 hover:-translate-y-1 transition-transform shadow-[4px_4px_0px_0px_rgba(255,215,0,0.2)]"
+                    disabled={isLoading}
+                    className={`flex-1 py-4 font-black uppercase flex items-center justify-center gap-2 transition-transform shadow-[4px_4px_0px_0px_rgba(255,215,0,0.2)] ${isLoading
+                        ? 'bg-[#333] text-[#666] cursor-wait'
+                        : 'bg-[#FFD700] text-black hover:translate-x-1 hover:-translate-y-1'
+                      }`}
                   >
-                    Crea Account <ArrowRight size={18} />
+                    {isLoading ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" /> Creazione...
+                      </>
+                    ) : (
+                      <>
+                        Crea Account <ArrowRight size={18} />
+                      </>
+                    )}
                   </button>
                 </div>
               </>
