@@ -1,164 +1,125 @@
-# OnboardFlow B2B
+# TokenGuard - LLM Cost Intelligence Platform
 
-Piattaforma per onboarding dipendenti e clienti con checklist, progress tracking e automazioni.
+🚀 **Monitor, optimize, and reduce your LLM API costs by up to 50%**
 
-## 🚀 Stack Tecnologico
+## What is TokenGuard?
 
-- **Framework:** Next.js 14 (App Router)
-- **Styling:** Tailwind CSS
-- **Database:** Supabase (PostgreSQL + Auth)
-- **Deploy:** Vercel
-- **CI/CD:** GitHub Actions
+TokenGuard helps teams track, analyze, and reduce their OpenAI, Anthropic, and other LLM API costs. Get real-time visibility into spending, detect duplicate calls, and receive actionable insights to optimize your AI budget.
 
-## 📋 Prerequisiti
+## Features
 
+- 📊 **Real-time Analytics** - Track costs per endpoint, model, and time period
+- 🔄 **Duplicate Detection** - Automatically identify redundant API calls
+- 🚨 **Budget Alerts** - Get notified before exceeding spending limits
+- ⚡ **Zero Code Changes** - Just change your API endpoint, we handle the rest
+- 💾 **Smart Caching** - Optional response caching for identical prompts
+- 👥 **Team Insights** - See which features drive the most LLM usage
+
+## Quick Start
+
+### Prerequisites
 - Node.js 18+
-- Account GitHub
-- Account Vercel
-- Account Supabase (free tier)
+- Supabase account
+- Vercel account
 
-## 🛠️ Setup Locale
+### Local Setup
 
 ```bash
-# Clona la repo
+# Clone the repo
 git clone https://github.com/bisonteeuropeo3/Test.b2b.git
 cd Test.b2b
 
-# Installa dipendenze
+# Install dependencies
 npm install
 
-# Configura variabili d'ambiente
+# Setup environment variables
 cp .env.example .env.local
-# Modifica .env.local con i tuoi valori (vedi sotto)
+# Edit .env.local with your Supabase credentials
 
-# Avvia in locale
+# Run database migrations in Supabase SQL Editor
+# See: supabase/migrations/001_tokenguard_schema.sql
+
+# Start development server
 npm run dev
 ```
 
-## 🔐 Variabili d'Ambiente
-
-Crea un file `.env.local` con:
+### Environment Variables
 
 ```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://djqtrggbnomhpjfkxjoo.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqcXRyZ2dibm9taHBqZmt4am9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5NzQzMzAsImV4cCI6MjA4ODU1MDMzMH0.gk8MwBwIB3NQ6xR1As_DZr4Xd8FShuN-Obtwat7cYPg
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqcXRyZ2dibm9taHBqZmt4am9vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Mjk3NDMzMCwiZXhwIjoyMDg4NTUwMzMwfQ.2C0x9CYWWqzieiibsw16MTRjQA9sEsJPoQjBG6C0Pks
-
-# App
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-**⚠️ IMPORTANTE:** Non committare mai `.env.local` o file con segreti! Il file è già nel `.gitignore`.
+## Deployment
 
-## 🌐 Deploy su Vercel
+### Vercel (Recommended)
 
-### Collegamento Repository
+1. Connect your GitHub repo to Vercel
+2. Set environment variables in Vercel dashboard
+3. Deploy from `sughifabre` branch
 
-1. Vai su [vercel.com](https://vercel.com) e accedi
-2. Clicca **"Add New Project"**
-3. Seleziona la repository `bisonteeuropeo3/Test.b2b`
-4. In **"Framework Preset"** seleziona **Next.js**
-5. In **"Branch"** seleziona **`sughifabre`** (non main!)
-6. Clicca **Deploy**
+### Supabase Setup
 
-### Configurazione Branch Deploy
+1. Create new project on Supabase
+2. Run SQL migrations in SQL Editor
+3. Enable Email Auth in Authentication settings
 
-1. Nel progetto Vercel, vai su **Settings → Git**
-2. In **"Production Branch"** imposta: `sughifabre`
-3. Salva le modifiche
+## Usage
 
-### Variabili d'Ambiente su Vercel (IMPORTANTE!)
+### Proxy Integration
 
-1. Vai su **Settings → Environment Variables**
-2. Aggiungi queste 3 variabili:
+Replace your OpenAI base URL:
 
-| Nome | Valore |
-|------|--------|
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://djqtrggbnomhpjfkxjoo.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqcXRyZ2dibm9taHBqZmt4am9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5NzQzMzAsImV4cCI6MjA4ODU1MDMzMH0.gk8MwBwIB3NQ6xR1As_DZr4Xd8FShuN-Obtwat7cYPg` |
-| `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqcXRyZ2dibm9taHBqZmt4am9vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Mjk3NDMzMCwiZXhwIjoyMDg4NTUwMzMwfQ.2C0x9CYWWqzieiibsw16MTRjQA9sEsJPoQjBG6C0Pks` |
+```javascript
+// Before
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-3. Clicca **Save**
-
-### Deploy Automatico
-
-Una volta configurato, ogni push su `sughifabre` attiverà automaticamente un deploy su Vercel.
-
-## 🔄 Workflow Git
-
-```
-main (stabile)
-  ↑
-dev (sviluppo attivo)
-  ↑
-sughifabre (deploy/production)
+// After
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: 'https://your-tokenguard.vercel.app/api/v1/proxy/openai',
+  defaultHeaders: {
+    'X-TokenGuard-Key': 'your-api-key'
+  }
+});
 ```
 
-### Branch
+## Pricing
 
-- **`main`**: Codice stabile, pronto per release
-- **`dev`**: Sviluppo attivo, feature in corso
-- **`sughifabre`**: Branch di deploy su Vercel
+| Plan | Price | Features |
+|------|-------|----------|
+| **Free** | $0 | 1 user, 10k logs/month |
+| **Pro** | $29/mo | Unlimited users, 100k logs, priority support |
+| **Enterprise** | $99/mo | Unlimited everything, custom integrations |
 
-### Convenzioni Commit
+## Tech Stack
 
-- `feat: nuova funzionalità`
-- `fix: correzione bug`
-- `chore: manutenzione/deps`
-- `docs: documentazione`
-- `test: test`
+- **Framework:** Next.js 14 (App Router)
+- **Database:** Supabase (PostgreSQL)
+- **Auth:** Supabase Auth
+- **Styling:** Tailwind CSS
+- **Charts:** Recharts
+- **Deploy:** Vercel
 
-## 🗄️ Setup Database Supabase
+## Contributing
 
-1. Vai su [supabase.com](https://supabase.com) → SQL Editor
-2. Crea una **New Query**
-3. Incolla il contenuto di `supabase/migrations/001_initial_schema.sql`
-4. Clicca **Run**
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## 🧪 CI/CD
+## License
 
-GitHub Actions esegue automaticamente:
-- Lint (ESLint)
-- Type checking
-- Build
-- Test (se presenti)
+MIT License - see [LICENSE](./LICENSE)
 
-## 📊 Costi Mensili
+## Support
 
-| Piano | Utenti | DB | Storage | Costo |
-|-------|--------|-----|---------|-------|
-| **Lite** | 50 | Supabase Free (500MB) | 1GB | **€0** |
-| **Standard** | 500 | Supabase Free | 5GB | **€0** |
-| **Enterprise** | 2000+ | Supabase Pro ($25) | 20GB | **~€25/mese** |
+For support, email support@tokenguard.io or join our Discord community.
 
-## 🔒 Sicurezza
+---
 
-- ✅ Secret scanning abilitato
-- ✅ Dependabot attivo
-- ✅ `.gitignore` configurato
-- ✅ Nessun segreto nel codice
-- ✅ Variabili d'ambiente su Vercel
-
-## 📁 Struttura Progetto
-
-```
-├── app/                 # Next.js App Router
-│   ├── api/            # API Routes
-│   ├── dashboard/      # Dashboard pages
-│   └── page.tsx        # Homepage
-├── components/         # React components
-├── lib/               # Utility functions
-├── types/             # TypeScript types
-├── public/            # Static assets
-├── .github/           # GitHub Actions
-└── supabase/          # Supabase migrations
-```
-
-## 📝 Changelog
-
-Vedi [CHANGELOG.md](./CHANGELOG.md) per lo storico modifiche.
-
-## 📄 Licenza
-
-MIT License - Vedi [LICENSE](./LICENSE)
+Built with ❤️ by the TokenGuard team
