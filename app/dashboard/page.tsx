@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import {
-  BarChart3,
   DollarSign,
   TrendingUp,
   AlertCircle,
@@ -12,8 +11,6 @@ import {
   Filter,
   Download,
   RefreshCw,
-  Box,
-  Lock,
   Terminal
 } from 'lucide-react'
 import Link from 'next/link'
@@ -233,7 +230,7 @@ export default function DashboardPage() {
 
           <div className="flex flex-wrap gap-4 items-center justify-between mb-8 border-b-2 border-[#222] pb-4 pl-4">
             <h3 className="font-black text-xl uppercase italic tracking-tighter flex items-center gap-2">
-              < النشاط > Stream_Richieste
+              {`< النشاط >`} Stream_Richieste
             </h3>
             <Link href="#" className="text-xs font-bold uppercase tracking-widest text-[#FFD700] hover:text-white transition-colors border-b border-transparent hover:border-white">
               Vedi_Analisi_Completa

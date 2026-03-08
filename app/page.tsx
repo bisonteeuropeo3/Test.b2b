@@ -179,7 +179,7 @@ export default function Home() {
                 <span className="text-xl font-black italic uppercase tracking-tighter">TokenGuard</span>
               </div>
               <p className="text-[#555] text-xs font-sans max-w-sm mb-6">
-                L'infrastruttura non deve essere bella, deve essere indistruttibile.
+                L&apos;infrastruttura non deve essere bella, deve essere indistruttibile.
                 Sviluppato per chi gestisce sistemi mission-critical.
               </p>
               <div className="flex gap-4">

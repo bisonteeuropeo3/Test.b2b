@@ -67,10 +67,10 @@ export default function SignupPage() {
               <div key={s.id} className="flex items-center gap-4">
                 <div
                   className={`flex items-center gap-2 px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-colors ${s.id === step
-                      ? 'bg-[#1A1A1A] text-[#FFD700] border border-[#FFD700]'
-                      : s.id < step
-                        ? 'bg-[#111] text-[#00FF41] border border-[#00FF41]/30'
-                        : 'bg-[#0F0F0F] text-[#444] border border-[#222]'
+                    ? 'bg-[#1A1A1A] text-[#FFD700] border border-[#FFD700]'
+                    : s.id < step
+                      ? 'bg-[#111] text-[#00FF41] border border-[#00FF41]/30'
+                      : 'bg-[#0F0F0F] text-[#444] border border-[#222]'
                     }`}
                 >
                   {s.id < step ? <CheckCircle2 size={14} /> : `[0${s.id}]`}
@@ -162,7 +162,7 @@ export default function SignupPage() {
                       <Terminal size={18} className="text-[#FFD700]" />
                       Topologia_Network
                     </h2>
-                    <p className="text-[#888] text-xs font-sans">Definisci l'entità aziendale e i parametri di telemetria previsti.</p>
+                    <p className="text-[#888] text-xs font-sans">Definisci l&apos;entità aziendale e i parametri di telemetria previsti.</p>
                   </div>
 
                   <div>
@@ -235,7 +235,7 @@ export default function SignupPage() {
                     </div>
                     <h3 className="text-2xl font-black uppercase italic tracking-tighter text-white mb-2">Parametri_Accettati</h3>
                     <p className="text-[10px] text-[#888] font-bold uppercase tracking-widest leading-relaxed">
-                      L'apertura del nodo implica l'accettazione<br />del protocollo di servizio EULA_v2.4
+                      L&apos;apertura del nodo implica l&apos;accettazione<br />del protocollo di servizio EULA_v2.4
                     </p>
                   </div>
 

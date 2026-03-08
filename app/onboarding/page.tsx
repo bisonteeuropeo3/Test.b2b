@@ -51,20 +51,20 @@ export default function OnboardingPage() {
             [ Inizializzazione Completata ]
           </div>
           <h1 className="text-4xl sm:text-5xl font-black uppercase italic tracking-tighter text-white">Setup_Operativo</h1>
-          <p className="mt-2 text-[#888] font-bold tracking-widest uppercase text-xs">Esegui l'onboarding per attivare la telemetria.</p>
+          <p className="mt-2 text-[#888] font-bold tracking-widest uppercase text-xs">Esegui l&apos;onboarding per attivare la telemetria.</p>
         </div>
 
         {/* Progress Tracker */}
         <div className="flex flex-col sm:flex-row justify-between mb-12 relative animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="absolute top-6 left-0 w-full h-[2px] bg-[#222] hidden sm:block -z-10" />
 
-          {steps.map((s, i) => (
+          {steps.map((s) => (
             <div key={s.id} className="flex flex-col items-center relative z-10 mb-6 sm:mb-0">
               <div className={`w-14 h-14 border-2 flex items-center justify-center font-black text-lg mb-4 transition-all ${step > s.id
-                  ? 'bg-[#00FF41]/10 border-[#00FF41] text-[#00FF41] shadow-[0_0_15px_rgba(0,255,65,0.2)]'
-                  : step === s.id
-                    ? 'bg-[#FFD700] border-[#FFD700] text-black shadow-[4px_4px_0px_0px_rgba(255,215,0,0.2)]'
-                    : 'bg-[#111] border-[#333] text-[#555]'
+                ? 'bg-[#00FF41]/10 border-[#00FF41] text-[#00FF41] shadow-[0_0_15px_rgba(0,255,65,0.2)]'
+                : step === s.id
+                  ? 'bg-[#FFD700] border-[#FFD700] text-black shadow-[4px_4px_0px_0px_rgba(255,215,0,0.2)]'
+                  : 'bg-[#111] border-[#333] text-[#555]'
                 }`}>
                 {step > s.id ? <CheckCircle2 size={24} /> : `0${s.id}`}
               </div>
@@ -114,7 +114,7 @@ export default function OnboardingPage() {
               <div className="bg-[#FFD700]/5 border border-[#FFD700]/30 p-4 border-l-4 border-l-[#FFD700]">
                 <p className="text-[#FFD700] text-[10px] font-bold tracking-widest uppercase">
                   <span className="text-white mr-2">AVVERTENZA_SICUREZZA:</span>
-                  Memorizza questa chiave nelle variabili d'ambiente. Non effettuarne il commit in repository pubblici.
+                  Memorizza questa chiave nelle variabili d&apos;ambiente. Non effettuarne il commit in repository pubblici.
                 </p>
               </div>
 
@@ -162,10 +162,10 @@ export default function OnboardingPage() {
                     <pre className="text-[#E0E0E0]">
                       <code>{`const openai = new OpenAI({
    apiKey: process.env.OPENAI_API_KEY,
- `}<span className="text-[#FFD700]">  baseURL: 'https://gateway.tokenguard.io/v1',</span>{`
- `}<span className="text-[#FFD700]">  defaultHeaders: {</span>{`
- `}<span className="text-[#FFD700]">    'X-TokenGuard-Key': process.env.TOKENGUARD_API_KEY,</span>{`
- `}<span className="text-[#FFD700]">  },</span>{`
+ `}<span className="text-[#FFD700]">{`  baseURL: 'https://gateway.tokenguard.io/v1',`}</span>{`
+ `}<span className="text-[#FFD700]">{`  defaultHeaders: {`}</span>{`
+ `}<span className="text-[#FFD700]">{`    'X-TokenGuard-Key': process.env.TOKENGUARD_API_KEY,`}</span>{`
+ `}<span className="text-[#FFD700]">{`  },`}</span>{`
  });`}</code>
                     </pre>
                   </div>
@@ -198,7 +198,7 @@ export default function OnboardingPage() {
                 </div>
                 <h3 className="text-3xl font-black uppercase italic tracking-tighter text-white mb-2">Connessione_Stabilita</h3>
                 <p className="text-[10px] text-[#888] font-bold uppercase tracking-widest">
-                  Il nodo è pronto a processare le pipeline d'inferenza.
+                  Il nodo è pronto a processare le pipeline d&apos;inferenza.
                 </p>
               </div>
 
@@ -233,7 +233,7 @@ export default function OnboardingPage() {
         {/* Footer Links */}
         <div className="mt-8 text-center text-[10px] font-bold uppercase tracking-widest text-[#555] flex justify-center gap-6">
           <a href="#" className="hover:text-[#FFD700] transition-colors border-b border-transparent hover:border-[#FFD700]">Doc_Tecnica</a>
-          <span>//</span>
+          <span>{`//`}</span>
           <a href="#" className="hover:text-[#FFD700] transition-colors border-b border-transparent hover:border-[#FFD700]">Supporto_Linea_1</a>
         </div>
       </div>
