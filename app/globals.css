@@ -2,22 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@400;700;800&display=swap');
+
 @layer base {
   * {
     @apply box-border;
   }
   
   html {
-    @apply antialiased;
+    @apply antialiased selection:bg-[#FFD700] selection:text-black;
   }
   
   body {
-    @apply bg-[#0a0a0f] text-white;
+    @apply bg-[#0F0F0F] text-[#E0E0E0] font-mono;
   }
-}
 
-@layer utilities {
-  .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-violet-400 via-fuchsia-400 to-pink-400;
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-sans font-black;
   }
 }

@@ -8,7 +8,16 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        background: '#0a0a0f',
+        background: '#0F0F0F',
+        token: {
+          dark: '#0F0F0F',
+          yellow: '#FFD700',
+          gray: '#E0E0E0',
+        }
+      },
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
       },
     },
   },
