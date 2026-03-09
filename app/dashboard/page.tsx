@@ -92,7 +92,7 @@ export default function DashboardPage() {
         return
       }
 
-      const response = await fetch(`/api/logs?days=${timeRange}`, {
+      const response = await fetch(`/api/v1/logs?days=${timeRange}`, {
         headers: authHeaders()
       })
 
