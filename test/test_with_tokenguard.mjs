@@ -17,9 +17,9 @@
 // ╔══════════════════════════════════════════╗
 // ║  INSERISCI LE TUE CHIAVI QUI            ║
 // ╚══════════════════════════════════════════╝
-const OPENAI_API_KEY = 'sk-INSERISCI_LA_TUA_CHIAVE_OPENAI_QUI'
-const TOKENGUARD_API_KEY = 'tg_live_INSERISCI_LA_TUA_CHIAVE_TOKENGUARD_QUI'
-const TOKENGUARD_URL = 'https://INSERISCI_IL_TUO_DOMINIO.vercel.app/api/v1/proxy/openai'
+const OPENAI_API_KEY = ''
+const TOKENGUARD_API_KEY = ''
+const TOKENGUARD_URL = ''
 // Esempio: 'https://test-b2b.vercel.app/api/v1/proxy/openai'
 // Per test locale: 'http://localhost:3000/api/v1/proxy/openai'
 

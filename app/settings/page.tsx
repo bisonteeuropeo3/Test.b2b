@@ -2,10 +2,29 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
     ArrowLeft, Key, Copy, Check, RefreshCw, Trash2,
     Shield, AlertTriangle, Plus, Eye, EyeOff
 } from 'lucide-react'
+
+function getSessionToken(): string | null {
+    if (typeof window === 'undefined') return null
+    try {
+        const sessionStr = localStorage.getItem('supabase_session')
+        if (!sessionStr) return null
+        const session = JSON.parse(sessionStr)
+        return session?.access_token || null
+    } catch {
+        return null
+    }
+}
+
+function authHeaders(): Record<string, string> {
+    const token = getSessionToken()
+    if (!token) return {}
+    return { 'Authorization': `Bearer ${token}` }
+}
 
 const GuardIcon = () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="square" strokeLinejoin="miter">
@@ -34,6 +53,7 @@ export default function SettingsPage() {
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+    const router = useRouter()
 
     const showNotification = useCallback((type: 'success' | 'error', message: string) => {
         setNotification({ type, message })
@@ -42,6 +62,11 @@ export default function SettingsPage() {
 
     // Load keys on mount
     useEffect(() => {
+        const token = getSessionToken()
+        if (!token) {
+            router.push('/login')
+            return
+        }
         loadApiKeys()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
@@ -49,7 +74,15 @@ export default function SettingsPage() {
     async function loadApiKeys() {
         setIsLoading(true)
         try {
-            const response = await fetch('/api/settings/keys')
+            const response = await fetch('/api/settings/keys', {
+                headers: authHeaders()
+            })
+            if (response.status === 401) {
+                localStorage.removeItem('supabase_session')
+                localStorage.removeItem('tokenguard_user_id')
+                router.push('/login')
+                return
+            }
             if (response.ok) {
                 const data = await response.json()
                 setApiKeys(data.keys || [])
@@ -117,7 +150,7 @@ export default function SettingsPage() {
             // Try server-side generation first
             const response = await fetch('/api/settings/keys', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...authHeaders() },
                 body: JSON.stringify({ label: newKeyLabel.trim() })
             })
 
@@ -171,7 +204,7 @@ export default function SettingsPage() {
         try {
             await fetch('/api/settings/keys', {
                 method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...authHeaders() },
                 body: JSON.stringify({ id, key: keyToRevoke.key })
             })
         } catch {
@@ -226,8 +259,8 @@ export default function SettingsPage() {
             {/* Notification */}
             {notification && (
                 <div className={`fixed top-4 right-4 z-[100] px-6 py-4 border-2 font-bold text-sm uppercase tracking-widest animate-in slide-in-from-top-2 ${notification.type === 'success'
-                        ? 'bg-green-500/10 border-green-500 text-green-400'
-                        : 'bg-red-500/10 border-red-500 text-red-400'
+                    ? 'bg-green-500/10 border-green-500 text-green-400'
+                    : 'bg-red-500/10 border-red-500 text-red-400'
                     }`}>
                     {notification.message}
                 </div>

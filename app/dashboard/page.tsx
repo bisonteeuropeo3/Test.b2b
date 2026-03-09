@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   RefreshCw,
   Wallet,
@@ -44,6 +45,30 @@ const GuardIcon = () => (
   </svg>
 );
 
+/**
+ * Gets the Supabase session token from localStorage.
+ */
+function getSessionToken(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const sessionStr = localStorage.getItem('supabase_session')
+    if (!sessionStr) return null
+    const session = JSON.parse(sessionStr)
+    return session?.access_token || null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Creates headers with Authorization Bearer token.
+ */
+function authHeaders(): Record<string, string> {
+  const token = getSessionToken()
+  if (!token) return {}
+  return { 'Authorization': `Bearer ${token}` }
+}
+
 export default function DashboardPage() {
   const [timeRange, setTimeRange] = useState('7')
   const [isLoading, setIsLoading] = useState(true)
@@ -55,20 +80,30 @@ export default function DashboardPage() {
     costSaved: 0,
     cachedRequests: 0
   }))
+  const router = useRouter()
 
-  useEffect(() => {
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
-      fetchDashboardData()
-    } else {
-      setIsLoading(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeRange])
-
-  async function fetchDashboardData() {
+  const fetchDashboardData = useCallback(async () => {
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/logs?days=${timeRange}`)
+      const token = getSessionToken()
+      if (!token) {
+        // Not authenticated — redirect to login
+        router.push('/login')
+        return
+      }
+
+      const response = await fetch(`/api/logs?days=${timeRange}`, {
+        headers: authHeaders()
+      })
+
+      if (response.status === 401) {
+        // Session expired — redirect to login
+        localStorage.removeItem('supabase_session')
+        localStorage.removeItem('tokenguard_user_id')
+        router.push('/login')
+        return
+      }
+
       if (response.ok) {
         const data = await response.json()
         setLogs(data.logs || [])
@@ -85,6 +120,22 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false)
     }
+  }, [timeRange, router])
+
+  useEffect(() => {
+    // Check authentication on mount
+    const token = getSessionToken()
+    if (!token) {
+      router.push('/login')
+      return
+    }
+    fetchDashboardData()
+  }, [fetchDashboardData, router])
+
+  const handleLogout = () => {
+    localStorage.removeItem('supabase_session')
+    localStorage.removeItem('tokenguard_user_id')
+    router.push('/login')
   }
 
   const modelStats = logs.reduce((acc, log) => {
@@ -124,9 +175,9 @@ export default function DashboardPage() {
                 <Settings size={18} />
               </Link>
               <div className="h-6 w-px bg-[#222]" />
-              <Link href="/" className="p-2 hover:text-[#FFD700] transition" title="Logout">
+              <button onClick={handleLogout} className="p-2 hover:text-[#FFD700] transition" title="Logout">
                 <LogOut size={18} />
-              </Link>
+              </button>
             </div>
           </div>
         </div>

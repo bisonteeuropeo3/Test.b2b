@@ -97,6 +97,7 @@ export async function POST(request: NextRequest) {
                 api_key: apiKey,
                 label: companyName || 'Default',
                 email,
+                user_id: userId,
                 plan: 'free',
                 monthly_budget: parseInt(monthlyBudget) || 100,
                 is_active: true,

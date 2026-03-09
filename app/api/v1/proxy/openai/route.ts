@@ -117,13 +117,14 @@ export async function POST(request: NextRequest) {
     // 1. Check api_keys table (standalone keys)
     const { data: apiKeyEntry } = await supabaseAdmin
       .from('api_keys')
-      .select('id, monthly_budget, is_active')
+      .select('id, user_id, monthly_budget, is_active')
       .eq('api_key', tokenGuardKey)
       .eq('is_active', true)
       .single()
 
     if (apiKeyEntry) {
-      userId = apiKeyEntry.id
+      // Use user_id (auth user) if available, otherwise fall back to row id
+      userId = apiKeyEntry.user_id || apiKeyEntry.id
       monthlyBudget = apiKeyEntry.monthly_budget || 100
       // Update last_used_at
       supabaseAdmin.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', apiKeyEntry.id).then(() => { })
