@@ -110,7 +110,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate API key — check api_keys table first, then profiles as fallback
+    // Validate API key — resolve userId in priority order:
+    // 1. api_keys table with user_id linked → use user_id (= profile/auth id)
+    // 2. profiles table by api_key → use profile.id (= auth user id)
+    // 3. auto-register in api_keys → use the api_keys row id as anonymous userId
     let userId: string | null = null
     let monthlyBudget = 100
 
@@ -123,24 +126,59 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (apiKeyEntry) {
-      // Use user_id (auth user) if available, otherwise fall back to row id
-      userId = apiKeyEntry.user_id || apiKeyEntry.id
-      monthlyBudget = apiKeyEntry.monthly_budget || 100
-      // Update last_used_at
-      supabaseAdmin.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', apiKeyEntry.id).then(() => { })
+      if (apiKeyEntry.user_id) {
+        // Key is linked to a real auth user — use that ID (matches profiles.id)
+        userId = apiKeyEntry.user_id
+      } else {
+        // Key exists but no user_id: try to find matching profile by api_key
+        const { data: profileByKey } = await supabaseAdmin
+          .from('profiles')
+          .select('id, monthly_budget')
+          .eq('api_key', tokenGuardKey)
+          .single()
+
+        if (profileByKey) {
+          // Link the api_keys entry to the profile for future lookups
+          userId = profileByKey.id
+          monthlyBudget = profileByKey.monthly_budget || 100
+          supabaseAdmin.from('api_keys')
+            .update({ user_id: profileByKey.id, last_used_at: new Date().toISOString() })
+            .eq('id', apiKeyEntry.id)
+            .then(() => { })
+        } else {
+          // Truly anonymous key — use the api_keys row id
+          userId = apiKeyEntry.id
+          monthlyBudget = apiKeyEntry.monthly_budget || 100
+          supabaseAdmin.from('api_keys')
+            .update({ last_used_at: new Date().toISOString() })
+            .eq('id', apiKeyEntry.id)
+            .then(() => { })
+        }
+      }
+      monthlyBudget = apiKeyEntry.monthly_budget || monthlyBudget
     } else {
-      // 2. Fallback: check profiles table (for keys created via Supabase Auth)
+      // 2. Fallback: check profiles table (keys created via Supabase Auth signup)
       const { data: profileEntry } = await supabaseAdmin
         .from('profiles')
-        .select('id, monthly_budget')
+        .select('id, monthly_budget, api_key')
         .eq('api_key', tokenGuardKey)
         .single()
 
       if (profileEntry) {
         userId = profileEntry.id
         monthlyBudget = profileEntry.monthly_budget || 100
+        // Also sync this key into api_keys table for faster future lookups
+        supabaseAdmin.from('api_keys').upsert({
+          api_key: tokenGuardKey,
+          user_id: profileEntry.id,
+          label: 'Synced from profile',
+          plan: 'free',
+          monthly_budget: profileEntry.monthly_budget || 100,
+          is_active: true,
+          last_used_at: new Date().toISOString(),
+        }, { onConflict: 'api_key' }).then(() => { })
       } else {
-        // 3. Key not found anywhere — auto-register in api_keys table
+        // 3. Key not found anywhere — auto-register as anonymous
         console.log('Auto-registering new API key:', tokenGuardKey.substring(0, 12) + '...')
 
         const { data: newKey, error: insertError } = await supabaseAdmin
@@ -160,7 +198,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json(
             {
               error: {
-                message: 'Could not validate or register API key. Please run the migration 003_standalone_api_keys.sql in Supabase, then try again. Error: ' + (insertError?.message || 'unknown'),
+                message: 'Could not validate or register API key. Error: ' + (insertError?.message || 'unknown'),
                 type: 'authentication_error',
                 code: 'key_registration_failed'
               }
@@ -170,7 +208,7 @@ export async function POST(request: NextRequest) {
         }
 
         userId = newKey.id
-        console.log('Auto-registered key with id:', newKey.id)
+        console.log('Auto-registered anonymous key with id:', newKey.id)
       }
     }
 

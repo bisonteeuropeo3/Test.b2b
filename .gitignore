@@ -42,7 +42,7 @@ logs/
 # Testing
 coverage/
 .nyc_output/
-
+test
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts

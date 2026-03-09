@@ -16,7 +16,7 @@
 // ╔══════════════════════════════════════════╗
 // ║  INSERISCI LA TUA CHIAVE QUI            ║
 // ╚══════════════════════════════════════════╝
-const OPENAI_API_KEY = 'sk-INSERISCI_LA_TUA_CHIAVE_OPENAI_QUI'
+const OPENAI_API_KEY = ''
 
 // ──────────────────────────────────────────
 // Non modificare sotto questa riga

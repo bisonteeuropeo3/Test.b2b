@@ -19,7 +19,7 @@
 // ╚══════════════════════════════════════════╝
 const OPENAI_API_KEY = ''
 const TOKENGUARD_API_KEY = ''
-const TOKENGUARD_URL = ''
+const TOKENGUARD_URL = 'https://test-b2b-inky.vercel.app/api/v1/proxy/openi'
 // Esempio: 'https://test-b2b.vercel.app/api/v1/proxy/openai'
 // Per test locale: 'http://localhost:3000/api/v1/proxy/openai'
 
