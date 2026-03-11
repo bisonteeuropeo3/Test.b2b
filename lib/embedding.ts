@@ -9,7 +9,7 @@ const supabaseAdmin = supabaseUrl && supabaseKey
   : null
 
 // Default similarity threshold (overridable via env)
-const DEFAULT_THRESHOLD = parseFloat(process.env.SEMANTIC_CACHE_THRESHOLD || '0.95')
+const DEFAULT_THRESHOLD = parseFloat(process.env.SEMANTIC_CACHE_THRESHOLD || '0.90')
 
 /**
  * Extracts a unified text string from the OpenAI chat completion body.

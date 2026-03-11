@@ -351,14 +351,18 @@ export async function POST(request: NextRequest) {
           requestCache.set(cacheKey, { response: data, timestamp: Date.now() })
           cleanCache()
 
-          // Save to semantic cache in background
-          saveToSemanticCache({
-            userId: userData.id,
-            promptText,
-            embedding,
-            responseContent: data,
-            modelUsed: model,
-          }).catch((err) => console.error('Semantic cache save error:', err))
+          // Save to semantic cache (await to ensure it completes on serverless)
+          try {
+            await saveToSemanticCache({
+              userId: userData.id,
+              promptText,
+              embedding,
+              responseContent: data,
+              modelUsed: model,
+            })
+          } catch (err) {
+            console.error('Semantic cache save error:', err)
+          }
 
           await checkBudgetAlert(userData.id, userData.monthly_budget)
 
