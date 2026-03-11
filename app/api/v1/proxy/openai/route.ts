@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import {
+  extractPromptText,
+  getEmbedding,
+  searchSemanticCache,
+  saveToSemanticCache,
+  updateCacheHit,
+} from '@/lib/embedding'
 
 // Initialize Supabase admin client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -116,11 +123,13 @@ export async function POST(request: NextRequest) {
     // 3. auto-register in api_keys → use the api_keys row id as anonymous userId
     let userId: string | null = null
     let monthlyBudget = 100
+    let semanticCacheEnabled = false
+    let semanticCacheTtl = 60
 
     // 1. Check api_keys table (standalone keys)
     const { data: apiKeyEntry } = await supabaseAdmin
       .from('api_keys')
-      .select('id, user_id, monthly_budget, is_active')
+      .select('id, user_id, monthly_budget, is_active, semantic_cache_enabled, semantic_cache_ttl_minutes')
       .eq('api_key', tokenGuardKey)
       .eq('is_active', true)
       .single()
@@ -133,7 +142,7 @@ export async function POST(request: NextRequest) {
         // Key exists but no user_id: try to find matching profile by api_key
         const { data: profileByKey } = await supabaseAdmin
           .from('profiles')
-          .select('id, monthly_budget')
+          .select('id, monthly_budget, semantic_cache_enabled, semantic_cache_ttl_minutes')
           .eq('api_key', tokenGuardKey)
           .single()
 
@@ -141,6 +150,8 @@ export async function POST(request: NextRequest) {
           // Link the api_keys entry to the profile for future lookups
           userId = profileByKey.id
           monthlyBudget = profileByKey.monthly_budget || 100
+          semanticCacheEnabled = profileByKey.semantic_cache_enabled || false
+          semanticCacheTtl = profileByKey.semantic_cache_ttl_minutes || 60
           supabaseAdmin.from('api_keys')
             .update({ user_id: profileByKey.id, last_used_at: new Date().toISOString() })
             .eq('id', apiKeyEntry.id)
@@ -156,17 +167,26 @@ export async function POST(request: NextRequest) {
         }
       }
       monthlyBudget = apiKeyEntry.monthly_budget || monthlyBudget
+      // API key-level semantic cache settings override profile defaults
+      if (apiKeyEntry.semantic_cache_enabled !== undefined && apiKeyEntry.semantic_cache_enabled !== null) {
+        semanticCacheEnabled = apiKeyEntry.semantic_cache_enabled
+      }
+      if (apiKeyEntry.semantic_cache_ttl_minutes) {
+        semanticCacheTtl = apiKeyEntry.semantic_cache_ttl_minutes
+      }
     } else {
       // 2. Fallback: check profiles table (keys created via Supabase Auth signup)
       const { data: profileEntry } = await supabaseAdmin
         .from('profiles')
-        .select('id, monthly_budget, api_key')
+        .select('id, monthly_budget, api_key, semantic_cache_enabled, semantic_cache_ttl_minutes')
         .eq('api_key', tokenGuardKey)
         .single()
 
       if (profileEntry) {
         userId = profileEntry.id
         monthlyBudget = profileEntry.monthly_budget || 100
+        semanticCacheEnabled = profileEntry.semantic_cache_enabled || false
+        semanticCacheTtl = profileEntry.semantic_cache_ttl_minutes || 60
         // Also sync this key into api_keys table for faster future lookups
         supabaseAdmin.from('api_keys').upsert({
           api_key: tokenGuardKey,
@@ -222,21 +242,20 @@ export async function POST(request: NextRequest) {
 
     const userData = { id: userId, monthly_budget: monthlyBudget }
 
-    // Generate prompt hash for duplicate detection
+    // Generate prompt hash for duplicate detection (existing hash cache)
     const promptHash = generatePromptHash(body)
     const cacheKey = `${userData.id}:${promptHash}`
 
-    // Check cache for duplicate
+    // ── STEP 1: Check existing in-memory hash cache (exact match, fast) ──
     const cached = requestCache.get(cacheKey)
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      // Log as cached response
       await logRequest({
         userId: userData.id,
         provider: 'openai',
         model: body.model || 'gpt-3.5-turbo',
         promptTokens: cached.response.usage?.prompt_tokens || 0,
         completionTokens: cached.response.usage?.completion_tokens || 0,
-        cost: 0, // No cost for cached response
+        cost: 0,
         endpoint: '/v1/chat/completions',
         cached: true,
         promptHash,
@@ -245,11 +264,121 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         ...cached.response,
-        _tokenguard: { cached: true, saved: true }
+        _tokenguard: { cached: true, method: 'hash' }
       }, { headers: corsHeaders })
     }
 
-    // Forward request to OpenAI
+    // ── STEP 2: Semantic cache lookup (if enabled) ──
+    if (semanticCacheEnabled && apiKey) {
+      try {
+        const promptText = extractPromptText(body)
+
+        if (promptText) {
+          const embedding = await getEmbedding(promptText, apiKey)
+
+          const semanticHit = await searchSemanticCache(
+            embedding,
+            userData.id,
+            semanticCacheTtl
+          )
+
+          if (semanticHit) {
+            // Semantic cache HIT — return cached response
+            updateCacheHit(semanticHit.id).catch(() => { })
+
+            await logRequest({
+              userId: userData.id,
+              provider: 'openai',
+              model: body.model || 'gpt-3.5-turbo',
+              promptTokens: 0,
+              completionTokens: 0,
+              cost: 0,
+              endpoint: '/v1/chat/completions',
+              cached: true,
+              promptHash,
+              latency: Date.now() - startTime,
+            })
+
+            return NextResponse.json({
+              ...semanticHit.response_content,
+              _tokenguard: {
+                cached: true,
+                method: 'semantic',
+                similarity: semanticHit.similarity,
+              }
+            }, { headers: corsHeaders })
+          }
+
+          // Semantic MISS — proceed to OpenAI, then save embedding
+          const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+          })
+
+          if (!openaiResponse.ok) {
+            const error = await openaiResponse.json()
+            return NextResponse.json(error, {
+              status: openaiResponse.status,
+              headers: corsHeaders
+            })
+          }
+
+          const data = await openaiResponse.json()
+          const latency = Date.now() - startTime
+          const model = body.model || 'gpt-3.5-turbo'
+          const promptTokens = data.usage?.prompt_tokens || 0
+          const completionTokens = data.usage?.completion_tokens || 0
+          const cost = calculateCost(model, promptTokens, completionTokens)
+
+          await logRequest({
+            userId: userData.id,
+            provider: 'openai',
+            model,
+            promptTokens,
+            completionTokens,
+            cost,
+            endpoint: '/v1/chat/completions',
+            cached: false,
+            promptHash,
+            latency,
+          })
+
+          // Save to both caches
+          requestCache.set(cacheKey, { response: data, timestamp: Date.now() })
+          cleanCache()
+
+          // Save to semantic cache in background
+          saveToSemanticCache({
+            userId: userData.id,
+            promptText,
+            embedding,
+            responseContent: data,
+            modelUsed: model,
+          }).catch((err) => console.error('Semantic cache save error:', err))
+
+          await checkBudgetAlert(userData.id, userData.monthly_budget)
+
+          return NextResponse.json({
+            ...data,
+            _tokenguard: {
+              logged: true,
+              cost,
+              latency,
+              cached: false
+            }
+          }, { headers: corsHeaders })
+        }
+      } catch (embeddingError) {
+        // If embedding fails, fall through to normal flow
+        console.error('Semantic cache error, falling back:', embeddingError)
+      }
+    }
+
+    // ── STEP 3: Normal flow (no semantic cache or fallback) ──
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -270,13 +399,11 @@ export async function POST(request: NextRequest) {
     const data = await openaiResponse.json()
     const latency = Date.now() - startTime
 
-    // Calculate cost
     const model = body.model || 'gpt-3.5-turbo'
     const promptTokens = data.usage?.prompt_tokens || 0
     const completionTokens = data.usage?.completion_tokens || 0
     const cost = calculateCost(model, promptTokens, completionTokens)
 
-    // Log the request
     await logRequest({
       userId: userData.id,
       provider: 'openai',
@@ -290,13 +417,9 @@ export async function POST(request: NextRequest) {
       latency,
     })
 
-    // Cache the response
     requestCache.set(cacheKey, { response: data, timestamp: Date.now() })
-
-    // Clean old cache entries (prevent memory leak)
     cleanCache()
 
-    // Check budget alert
     await checkBudgetAlert(userData.id, userData.monthly_budget)
 
     return NextResponse.json({

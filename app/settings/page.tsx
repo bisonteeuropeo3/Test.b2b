@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
     ArrowLeft, Key, Copy, Check, RefreshCw, Trash2,
-    Shield, AlertTriangle, Plus, Eye, EyeOff
+    Shield, AlertTriangle, Plus, Eye, EyeOff,
+    Database, Clock, Zap
 } from 'lucide-react'
 
 function getSessionToken(): string | null {
@@ -53,14 +54,28 @@ export default function SettingsPage() {
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+    const [semanticCacheEnabled, setSemanticCacheEnabled] = useState(false)
+    const [semanticCacheTtl, setSemanticCacheTtl] = useState(60)
+    const [isSavingCache, setIsSavingCache] = useState(false)
     const router = useRouter()
+
+    const TTL_OPTIONS = [
+        { value: 5, label: '5 minuti', freshness: 100 },
+        { value: 15, label: '15 minuti', freshness: 90 },
+        { value: 30, label: '30 minuti', freshness: 80 },
+        { value: 60, label: '1 ora', freshness: 65 },
+        { value: 360, label: '6 ore', freshness: 45 },
+        { value: 1440, label: '1 giorno', freshness: 30 },
+        { value: 4320, label: '3 giorni', freshness: 15 },
+        { value: 10080, label: '7 giorni', freshness: 5 },
+    ]
 
     const showNotification = useCallback((type: 'success' | 'error', message: string) => {
         setNotification({ type, message })
         setTimeout(() => setNotification(null), 4000)
     }, [])
 
-    // Load keys on mount
+    // Load keys and cache settings on mount
     useEffect(() => {
         const token = getSessionToken()
         if (!token) {
@@ -68,8 +83,44 @@ export default function SettingsPage() {
             return
         }
         loadApiKeys()
+        loadCacheSettings()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
+
+    async function loadCacheSettings() {
+        try {
+            const response = await fetch('/api/settings/cache', {
+                headers: authHeaders()
+            })
+            if (response.ok) {
+                const data = await response.json()
+                setSemanticCacheEnabled(data.semantic_cache_enabled || false)
+                setSemanticCacheTtl(data.semantic_cache_ttl_minutes || 60)
+            }
+        } catch {
+            // Silently fail, use defaults
+        }
+    }
+
+    async function updateCacheSettings(updates: { semantic_cache_enabled?: boolean; semantic_cache_ttl_minutes?: number }) {
+        setIsSavingCache(true)
+        try {
+            const response = await fetch('/api/settings/cache', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                body: JSON.stringify(updates)
+            })
+            if (response.ok) {
+                showNotification('success', 'Impostazioni cache aggiornate')
+            } else {
+                showNotification('error', 'Errore nel salvataggio')
+            }
+        } catch {
+            showNotification('error', 'Errore di connessione')
+        } finally {
+            setIsSavingCache(false)
+        }
+    }
 
     async function loadApiKeys() {
         setIsLoading(true)
@@ -459,6 +510,118 @@ export default function SettingsPage() {
                             ))}
                         </div>
                     )}
+                </section>
+
+                {/* Smart Cache Section */}
+                <section className="mb-8">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <Database size={20} className="text-[#FFD700]" />
+                            <h2 className="text-xl font-black uppercase italic">Smart Cache</h2>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {isSavingCache && <RefreshCw size={14} className="animate-spin text-[#555]" />}
+                            <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 ${semanticCacheEnabled
+                                ? 'bg-green-500/10 text-green-400 border border-green-500/30'
+                                : 'bg-[#222] text-[#555] border border-[#333]'
+                                }`}>
+                                {semanticCacheEnabled ? 'Attivo' : 'Disattivato'}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Description */}
+                    <div className="bg-blue-500/5 border-2 border-blue-500/20 p-4 mb-6">
+                        <div className="flex items-start gap-3">
+                            <Zap size={18} className="text-blue-400 shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-blue-300 text-sm font-sans">
+                                    <strong className="font-bold uppercase">Semantic Cache:</strong> Usa gli embedding AI per intercettare chiamate <em>simili</em> (non solo identiche). Quando una domanda è semanticamente vicina ad una già fatta, restituisce la risposta dalla cache senza chiamare OpenAI.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="border-2 border-[#222] bg-[#111] p-6 space-y-6">
+                        {/* Toggle */}
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <div className="font-black uppercase text-sm">Abilita Semantic Cache</div>
+                                <div className="text-[#777] text-xs font-sans mt-1">Intercetta chiamate API simili e restituisci risposte dalla cache</div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const newValue = !semanticCacheEnabled
+                                    setSemanticCacheEnabled(newValue)
+                                    updateCacheSettings({ semantic_cache_enabled: newValue })
+                                }}
+                                className={`w-14 h-7 rounded-full transition-colors relative ${
+                                    semanticCacheEnabled ? 'bg-[#FFD700]' : 'bg-[#333]'
+                                }`}
+                            >
+                                <div className={`w-5 h-5 rounded-full bg-white absolute top-1 transition-transform ${
+                                    semanticCacheEnabled ? 'translate-x-8' : 'translate-x-1'
+                                }`} />
+                            </button>
+                        </div>
+
+                        {/* TTL Selector */}
+                        {semanticCacheEnabled && (
+                            <>
+                                <div className="border-t border-[#222] pt-6">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <Clock size={16} className="text-[#FFD700]" />
+                                        <div className="font-black uppercase text-sm">Durata Cache (TTL)</div>
+                                    </div>
+                                    <div className="text-[#777] text-xs font-sans mb-4">
+                                        Quanto tempo le risposte simili restano in cache prima di essere rinnovate.
+                                        Un TTL più breve = risposte più aggiornate, un TTL più lungo = più risparmio.
+                                    </div>
+
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                        {TTL_OPTIONS.map((opt) => (
+                                            <button
+                                                key={opt.value}
+                                                onClick={() => {
+                                                    setSemanticCacheTtl(opt.value)
+                                                    updateCacheSettings({ semantic_cache_ttl_minutes: opt.value })
+                                                }}
+                                                className={`px-3 py-3 text-xs font-black uppercase tracking-wider transition-all border-2 ${
+                                                    semanticCacheTtl === opt.value
+                                                        ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]'
+                                                        : 'border-[#222] bg-[#0F0F0F] text-[#777] hover:border-[#444] hover:text-white'
+                                                }`}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Freshness Indicator */}
+                                <div className="border-t border-[#222] pt-6">
+                                    <div className="flex items-center justify-between text-xs mb-2">
+                                        <span className="text-[#777] font-bold uppercase tracking-widest">Max Risparmio</span>
+                                        <span className="text-[#777] font-bold uppercase tracking-widest">Max Freschezza</span>
+                                    </div>
+                                    <div className="w-full bg-[#222] h-2 relative">
+                                        <div
+                                            className="h-2 transition-all duration-500"
+                                            style={{
+                                                width: `${TTL_OPTIONS.find(o => o.value === semanticCacheTtl)?.freshness || 50}%`,
+                                                background: `linear-gradient(90deg, #FFD700, #00C853)`,
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="text-center mt-2">
+                                        <span className="text-[10px] font-bold text-[#FFD700] uppercase tracking-widest">
+                                            Cache valida per {TTL_OPTIONS.find(o => o.value === semanticCacheTtl)?.label}
+                                        </span>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </section>
 
                 {/* Account Info */}
