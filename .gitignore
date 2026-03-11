@@ -42,7 +42,11 @@ Thumbs.db
 # Testing
 coverage/
 .nyc_output/
-test
+test/
+
+# Test scripts con API key hardcoded (NON committare!)
+test_direct_openai.mjs
+test_with_tokenguard.mjs
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts

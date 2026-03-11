@@ -449,13 +449,21 @@ export async function POST(request: NextRequest) {
 
 // Helper functions
 function generatePromptHash(body: any): string {
-  // Simple hash based on model and messages
+  // Proper hash: use DJB2 algorithm over the full content
   const content = JSON.stringify({
     model: body.model,
     messages: body.messages,
     temperature: body.temperature,
   })
-  return btoa(content).slice(0, 32)
+  // DJB2 hash — fast, low collision for text
+  let hash1 = 5381
+  let hash2 = 52711
+  for (let i = 0; i < content.length; i++) {
+    const char = content.charCodeAt(i)
+    hash1 = ((hash1 << 5) + hash1 + char) >>> 0
+    hash2 = ((hash2 << 5) + hash2 + char) >>> 0
+  }
+  return hash1.toString(36) + hash2.toString(36)
 }
 
 function calculateCost(model: string, promptTokens: number, completionTokens: number): number {
