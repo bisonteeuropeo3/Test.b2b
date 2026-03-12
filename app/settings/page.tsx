@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
     ArrowLeft, Key, Copy, Check, RefreshCw, Trash2,
     Shield, AlertTriangle, Plus, Eye, EyeOff,
-    Database, Clock, Zap
+    Database, Clock, Zap, Scissors
 } from 'lucide-react'
 
 function getSessionToken(): string | null {
@@ -57,6 +57,9 @@ export default function SettingsPage() {
     const [semanticCacheEnabled, setSemanticCacheEnabled] = useState(false)
     const [semanticCacheTtl, setSemanticCacheTtl] = useState(60)
     const [isSavingCache, setIsSavingCache] = useState(false)
+    const [pruningEnabled, setPruningEnabled] = useState(false)
+    const [pruningIntensity, setPruningIntensity] = useState('medium')
+    const [isSavingPruning, setIsSavingPruning] = useState(false)
     const router = useRouter()
 
     const TTL_OPTIONS = [
@@ -84,6 +87,7 @@ export default function SettingsPage() {
         }
         loadApiKeys()
         loadCacheSettings()
+        loadPruningSettings()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -119,6 +123,37 @@ export default function SettingsPage() {
             showNotification('error', 'Errore di connessione')
         } finally {
             setIsSavingCache(false)
+        }
+    }
+
+    async function loadPruningSettings() {
+        try {
+            const response = await fetch('/api/settings/pruning', { headers: authHeaders() })
+            if (response.ok) {
+                const data = await response.json()
+                setPruningEnabled(data.pruning_enabled || false)
+                setPruningIntensity(data.pruning_intensity || 'medium')
+            }
+        } catch { /* defaults */ }
+    }
+
+    async function updatePruningSettings(updates: { pruning_enabled?: boolean; pruning_intensity?: string }) {
+        setIsSavingPruning(true)
+        try {
+            const response = await fetch('/api/settings/pruning', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                body: JSON.stringify(updates)
+            })
+            if (response.ok) {
+                showNotification('success', 'Impostazioni pruning aggiornate')
+            } else {
+                showNotification('error', 'Errore nel salvataggio')
+            }
+        } catch {
+            showNotification('error', 'Errore di connessione')
+        } finally {
+            setIsSavingPruning(false)
         }
     }
 
@@ -617,6 +652,174 @@ export default function SettingsPage() {
                                         <span className="text-[10px] font-bold text-[#FFD700] uppercase tracking-widest">
                                             Cache valida per {TTL_OPTIONS.find(o => o.value === semanticCacheTtl)?.label}
                                         </span>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </section>
+
+                {/* Context Pruning Section */}
+                <section className="mb-8">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <Scissors size={20} className="text-[#FFD700]" />
+                            <h2 className="text-xl font-black uppercase italic">Context Pruning</h2>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {isSavingPruning && <RefreshCw size={14} className="animate-spin text-[#555]" />}
+                            <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 ${pruningEnabled
+                                ? 'bg-green-500/10 text-green-400 border border-green-500/30'
+                                : 'bg-[#222] text-[#555] border border-[#333]'
+                                }`}>
+                                {pruningEnabled ? 'Attivo' : 'Disattivato'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="bg-purple-500/5 border-2 border-purple-500/20 p-4 mb-6">
+                        <div className="flex items-start gap-3">
+                            <Scissors size={18} className="text-purple-400 shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-purple-300 text-sm font-sans">
+                                    <strong className="font-bold uppercase">Context Pruning:</strong> Nelle chat multi-turno, comprime automaticamente i messaggi vecchi in un riassunto per risparmiare token. Più la conversazione è lunga, più risparmi.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="border-2 border-[#222] bg-[#111] p-6 space-y-6">
+                        {/* Toggle */}
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <div className="font-black uppercase text-sm">Abilita Context Pruning</div>
+                                <div className="text-[#777] text-xs font-sans mt-1">Comprime automaticamente la cronologia chat per risparmiare token</div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const newValue = !pruningEnabled
+                                    setPruningEnabled(newValue)
+                                    updatePruningSettings({ pruning_enabled: newValue })
+                                }}
+                                className={`w-14 h-7 rounded-full transition-colors relative ${
+                                    pruningEnabled ? 'bg-[#FFD700]' : 'bg-[#333]'
+                                }`}
+                            >
+                                <div className={`w-5 h-5 rounded-full bg-white absolute top-1 transition-transform ${
+                                    pruningEnabled ? 'translate-x-8' : 'translate-x-1'
+                                }`} />
+                            </button>
+                        </div>
+
+                        {/* Intensity Selector */}
+                        {pruningEnabled && (
+                            <>
+                                <div className="border-t border-[#222] pt-6">
+                                    <div className="font-black uppercase text-sm mb-4">Intensità Pruning</div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        {/* LOW */}
+                                        <button
+                                            onClick={() => { setPruningIntensity('low'); updatePruningSettings({ pruning_intensity: 'low' }) }}
+                                            className={`p-4 text-left border-2 transition-all ${
+                                                pruningIntensity === 'low'
+                                                    ? 'border-green-500 bg-green-500/5'
+                                                    : 'border-[#222] bg-[#0F0F0F] hover:border-[#444]'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className={`text-xs font-black uppercase ${pruningIntensity === 'low' ? 'text-green-400' : 'text-[#777]'}`}>Bassa</span>
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 ${pruningIntensity === 'low' ? 'bg-green-500/20 text-green-400' : 'bg-[#222] text-[#555]'}`}>40-60%</span>
+                                            </div>
+                                            <p className="text-[#999] text-[11px] font-sans leading-relaxed">
+                                                Riassunto dettagliato, mantiene <strong className="text-white">8 messaggi</strong> recenti. Per task importanti.
+                                            </p>
+                                            <div className="mt-3 w-full bg-[#222] h-1.5">
+                                                <div className="h-1.5 bg-green-500" style={{ width: '50%' }} />
+                                            </div>
+                                        </button>
+
+                                        {/* MEDIUM */}
+                                        <button
+                                            onClick={() => { setPruningIntensity('medium'); updatePruningSettings({ pruning_intensity: 'medium' }) }}
+                                            className={`p-4 text-left border-2 transition-all ${
+                                                pruningIntensity === 'medium'
+                                                    ? 'border-[#FFD700] bg-[#FFD700]/5'
+                                                    : 'border-[#222] bg-[#0F0F0F] hover:border-[#444]'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className={`text-xs font-black uppercase ${pruningIntensity === 'medium' ? 'text-[#FFD700]' : 'text-[#777]'}`}>Media</span>
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 ${pruningIntensity === 'medium' ? 'bg-[#FFD700]/20 text-[#FFD700]' : 'bg-[#222] text-[#555]'}`}>60-80%</span>
+                                            </div>
+                                            <p className="text-[#999] text-[11px] font-sans leading-relaxed">
+                                                Riassunto bilanciato, mantiene <strong className="text-white">4 messaggi</strong> recenti. Buon compromesso.
+                                            </p>
+                                            <div className="mt-3 w-full bg-[#222] h-1.5">
+                                                <div className="h-1.5 bg-[#FFD700]" style={{ width: '70%' }} />
+                                            </div>
+                                        </button>
+
+                                        {/* HIGH */}
+                                        <button
+                                            onClick={() => { setPruningIntensity('high'); updatePruningSettings({ pruning_intensity: 'high' }) }}
+                                            className={`p-4 text-left border-2 transition-all ${
+                                                pruningIntensity === 'high'
+                                                    ? 'border-orange-500 bg-orange-500/5'
+                                                    : 'border-[#222] bg-[#0F0F0F] hover:border-[#444]'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className={`text-xs font-black uppercase ${pruningIntensity === 'high' ? 'text-orange-400' : 'text-[#777]'}`}>Alta</span>
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 ${pruningIntensity === 'high' ? 'bg-orange-500/20 text-orange-400' : 'bg-[#222] text-[#555]'}`}>80-95%</span>
+                                            </div>
+                                            <p className="text-[#999] text-[11px] font-sans leading-relaxed">
+                                                Riassunto minimo, mantiene <strong className="text-white">2 messaggi</strong> recenti. Per chat casual.
+                                            </p>
+                                            <div className="mt-3 w-full bg-[#222] h-1.5">
+                                                <div className="h-1.5 bg-orange-500" style={{ width: '90%' }} />
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Savings visualization */}
+                                <div className="border-t border-[#222] pt-6">
+                                    <div className="bg-[#0A0A0A] border border-[#222] p-4">
+                                        <div className="text-[10px] font-bold uppercase tracking-widest text-[#555] mb-3">Stima risparmio in una chat da 20 messaggi</div>
+                                        <div className="flex items-end gap-4">
+                                            <div className="text-center">
+                                                <div className="text-[#555] text-[10px] font-bold uppercase mb-1">Senza</div>
+                                                <div className="w-8 bg-red-500/30 mx-auto" style={{ height: '60px' }} />
+                                                <div className="text-[#777] text-[10px] mt-1">2800</div>
+                                            </div>
+                                            <div className="text-center">
+                                                <div className={`text-[10px] font-bold uppercase mb-1 ${
+                                                    pruningIntensity === 'low' ? 'text-green-400' :
+                                                    pruningIntensity === 'medium' ? 'text-[#FFD700]' : 'text-orange-400'
+                                                }`}>Con</div>
+                                                <div className={`w-8 mx-auto ${
+                                                    pruningIntensity === 'low' ? 'bg-green-500/30' :
+                                                    pruningIntensity === 'medium' ? 'bg-[#FFD700]/30' : 'bg-orange-500/30'
+                                                }`} style={{
+                                                    height: pruningIntensity === 'low' ? '30px' :
+                                                           pruningIntensity === 'medium' ? '18px' : '8px'
+                                                }} />
+                                                <div className="text-[#777] text-[10px] mt-1">
+                                                    {pruningIntensity === 'low' ? '~1400' :
+                                                     pruningIntensity === 'medium' ? '~700' : '~280'}
+                                                </div>
+                                            </div>
+                                            <div className="flex-1 text-right">
+                                                <div className={`text-2xl font-black ${
+                                                    pruningIntensity === 'low' ? 'text-green-400' :
+                                                    pruningIntensity === 'medium' ? 'text-[#FFD700]' : 'text-orange-400'
+                                                }`}>
+                                                    -{pruningIntensity === 'low' ? '50' :
+                                                      pruningIntensity === 'medium' ? '75' : '90'}%
+                                                </div>
+                                                <div className="text-[#555] text-[10px] font-bold uppercase">token risparmiati</div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </>

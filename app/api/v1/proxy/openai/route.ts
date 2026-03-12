@@ -7,6 +7,7 @@ import {
   saveToSemanticCache,
   updateCacheHit,
 } from '@/lib/embedding'
+import { pruneMessages, PruningIntensity } from '@/lib/pruning'
 
 // Initialize Supabase admin client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -125,11 +126,13 @@ export async function POST(request: NextRequest) {
     let monthlyBudget = 100
     let semanticCacheEnabled = false
     let semanticCacheTtl = 60
+    let pruningEnabled = false
+    let pruningIntensity: PruningIntensity = 'medium'
 
     // 1. Check api_keys table (standalone keys)
     const { data: apiKeyEntry } = await supabaseAdmin
       .from('api_keys')
-      .select('id, user_id, monthly_budget, is_active, semantic_cache_enabled, semantic_cache_ttl_minutes')
+      .select('id, user_id, monthly_budget, is_active, semantic_cache_enabled, semantic_cache_ttl_minutes, pruning_enabled, pruning_intensity')
       .eq('api_key', tokenGuardKey)
       .eq('is_active', true)
       .single()
@@ -142,7 +145,7 @@ export async function POST(request: NextRequest) {
         // Key exists but no user_id: try to find matching profile by api_key
         const { data: profileByKey } = await supabaseAdmin
           .from('profiles')
-          .select('id, monthly_budget, semantic_cache_enabled, semantic_cache_ttl_minutes')
+          .select('id, monthly_budget, semantic_cache_enabled, semantic_cache_ttl_minutes, pruning_enabled, pruning_intensity')
           .eq('api_key', tokenGuardKey)
           .single()
 
@@ -152,6 +155,8 @@ export async function POST(request: NextRequest) {
           monthlyBudget = profileByKey.monthly_budget || 100
           semanticCacheEnabled = profileByKey.semantic_cache_enabled || false
           semanticCacheTtl = profileByKey.semantic_cache_ttl_minutes || 60
+          pruningEnabled = profileByKey.pruning_enabled || false
+          pruningIntensity = profileByKey.pruning_intensity || 'medium'
           supabaseAdmin.from('api_keys')
             .update({ user_id: profileByKey.id, last_used_at: new Date().toISOString() })
             .eq('id', apiKeyEntry.id)
@@ -174,11 +179,17 @@ export async function POST(request: NextRequest) {
       if (apiKeyEntry.semantic_cache_ttl_minutes) {
         semanticCacheTtl = apiKeyEntry.semantic_cache_ttl_minutes
       }
+      if (apiKeyEntry.pruning_enabled !== undefined && apiKeyEntry.pruning_enabled !== null) {
+        pruningEnabled = apiKeyEntry.pruning_enabled
+      }
+      if (apiKeyEntry.pruning_intensity) {
+        pruningIntensity = apiKeyEntry.pruning_intensity
+      }
     } else {
       // 2. Fallback: check profiles table (keys created via Supabase Auth signup)
       const { data: profileEntry } = await supabaseAdmin
         .from('profiles')
-        .select('id, monthly_budget, api_key, semantic_cache_enabled, semantic_cache_ttl_minutes')
+        .select('id, monthly_budget, api_key, semantic_cache_enabled, semantic_cache_ttl_minutes, pruning_enabled, pruning_intensity')
         .eq('api_key', tokenGuardKey)
         .single()
 
@@ -187,6 +198,8 @@ export async function POST(request: NextRequest) {
         monthlyBudget = profileEntry.monthly_budget || 100
         semanticCacheEnabled = profileEntry.semantic_cache_enabled || false
         semanticCacheTtl = profileEntry.semantic_cache_ttl_minutes || 60
+        pruningEnabled = profileEntry.pruning_enabled || false
+        pruningIntensity = profileEntry.pruning_intensity || 'medium'
         // Also sync this key into api_keys table for faster future lookups
         supabaseAdmin.from('api_keys').upsert({
           api_key: tokenGuardKey,
@@ -242,6 +255,19 @@ export async function POST(request: NextRequest) {
 
     const userData = { id: userId, monthly_budget: monthlyBudget }
 
+    // ── STEP 0: Context Window Pruning (if enabled) ──
+    let pruningResult = null
+    if (pruningEnabled && apiKey && body.messages && body.messages.length > 0) {
+      try {
+        pruningResult = await pruneMessages(body.messages, pruningIntensity, apiKey)
+        if (pruningResult.pruned) {
+          body.messages = pruningResult.messages
+        }
+      } catch (pruningError) {
+        console.error('Pruning error, continuing with original messages:', pruningError)
+      }
+    }
+
     // Generate prompt hash for duplicate detection (existing hash cache)
     const promptHash = generatePromptHash(body)
     const cacheKey = `${userData.id}:${promptHash}`
@@ -264,7 +290,15 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         ...cached.response,
-        _tokenguard: { cached: true, method: 'hash' }
+        _tokenguard: {
+          cached: true,
+          method: 'hash',
+          ...(pruningResult?.pruned && {
+            pruned: true,
+            pruning_intensity: pruningIntensity,
+            tokens_saved_by_pruning: pruningResult.estimatedTokensSaved,
+          }),
+        }
       }, { headers: corsHeaders })
     }
 
@@ -305,6 +339,11 @@ export async function POST(request: NextRequest) {
                 cached: true,
                 method: 'semantic',
                 similarity: semanticHit.similarity,
+                ...(pruningResult?.pruned && {
+                  pruned: true,
+                  pruning_intensity: pruningIntensity,
+                  tokens_saved_by_pruning: pruningResult.estimatedTokensSaved,
+                }),
               }
             }, { headers: corsHeaders })
           }
@@ -372,7 +411,14 @@ export async function POST(request: NextRequest) {
               logged: true,
               cost,
               latency,
-              cached: false
+              cached: false,
+              ...(pruningResult?.pruned && {
+                pruned: true,
+                pruning_intensity: pruningIntensity,
+                tokens_saved_by_pruning: pruningResult.estimatedTokensSaved,
+                original_messages: pruningResult.originalCount,
+                pruned_messages: pruningResult.prunedCount,
+              }),
             }
           }, { headers: corsHeaders })
         }
@@ -432,7 +478,14 @@ export async function POST(request: NextRequest) {
         logged: true,
         cost,
         latency,
-        cached: false
+        cached: false,
+        ...(pruningResult?.pruned && {
+          pruned: true,
+          pruning_intensity: pruningIntensity,
+          tokens_saved_by_pruning: pruningResult.estimatedTokensSaved,
+          original_messages: pruningResult.originalCount,
+          pruned_messages: pruningResult.prunedCount,
+        }),
       }
     }, { headers: corsHeaders })
 
