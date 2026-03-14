@@ -18,12 +18,43 @@ async function getUserIdFromToken(request: NextRequest): Promise<string | null> 
   return user.id
 }
 
-/** GET /api/settings/routing — Read current routing settings */
+const VALID_MODELS = [
+  'gpt-4o-mini', 'gpt-4.1-mini', 'gpt-4.1-nano', 'gpt-4.1',
+  'gpt-4o', 'gpt-5-mini', 'gpt-5-nano',
+  'gpt-5', 'gpt-5.4', 'gpt-5.4-pro',
+]
+
+/**
+ * GET /api/settings/routing?api_key_id=xxx
+ * Se api_key_id è presente, legge le impostazioni della singola chiave.
+ * Altrimenti legge i defaults dal profilo utente.
+ */
 export async function GET(request: NextRequest) {
   const userId = await getUserIdFromToken(request)
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!supabaseAdmin) return NextResponse.json({ error: 'Server not configured' }, { status: 500 })
 
+  const apiKeyId = request.nextUrl.searchParams.get('api_key_id')
+
+  // Per-key settings
+  if (apiKeyId) {
+    const { data: keyData } = await supabaseAdmin
+      .from('api_keys')
+      .select('routing_enabled, routing_cheap_model, routing_allowed_models')
+      .eq('id', apiKeyId)
+      .eq('user_id', userId)
+      .single()
+
+    if (keyData) {
+      return NextResponse.json({
+        routing_enabled: keyData.routing_enabled ?? false,
+        routing_cheap_model: keyData.routing_cheap_model ?? 'gpt-4o-mini',
+        routing_allowed_models: keyData.routing_allowed_models ?? ['gpt-4o-mini', 'gpt-5.4', 'gpt-5.4-pro'],
+      })
+    }
+  }
+
+  // Fallback: profile defaults
   const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('routing_enabled, routing_cheap_model, routing_allowed_models')
@@ -33,20 +64,28 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     routing_enabled: profile?.routing_enabled ?? false,
     routing_cheap_model: profile?.routing_cheap_model ?? 'gpt-4o-mini',
-    routing_allowed_models: profile?.routing_allowed_models ?? ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
+    routing_allowed_models: profile?.routing_allowed_models ?? ['gpt-4o-mini', 'gpt-5.4', 'gpt-5.4-pro'],
   })
 }
 
-/** PATCH /api/settings/routing — Update routing settings */
+/**
+ * PATCH /api/settings/routing
+ * Body opzionale: api_key_id per aggiornare una singola chiave.
+ * Senza api_key_id aggiorna il profilo e tutte le active keys.
+ */
 export async function PATCH(request: NextRequest) {
   const userId = await getUserIdFromToken(request)
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!supabaseAdmin) return NextResponse.json({ error: 'Server not configured' }, { status: 500 })
 
-  const body = await request.json()
-  const validModels = [
-    'gpt-4o-mini', 'gpt-4.1-mini', 'gpt-5.4', 'gpt-5.4-pro'
-  ]
+  let body: Record<string, any>
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  const apiKeyId = body.api_key_id as string | undefined
   const updates: Record<string, any> = {}
 
   if (typeof body.routing_enabled === 'boolean') {
@@ -54,9 +93,9 @@ export async function PATCH(request: NextRequest) {
   }
 
   if (typeof body.routing_cheap_model === 'string') {
-    if (!validModels.includes(body.routing_cheap_model)) {
+    if (!VALID_MODELS.includes(body.routing_cheap_model)) {
       return NextResponse.json(
-        { error: `Model must be one of: ${validModels.join(', ')}` },
+        { error: `Model must be one of: ${VALID_MODELS.join(', ')}` },
         { status: 400 }
       )
     }
@@ -64,7 +103,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   if (Array.isArray(body.routing_allowed_models)) {
-    const invalid = body.routing_allowed_models.filter((m: string) => !validModels.includes(m))
+    const invalid = body.routing_allowed_models.filter((m: string) => !VALID_MODELS.includes(m))
     if (invalid.length > 0) {
       return NextResponse.json(
         { error: `Invalid models: ${invalid.join(', ')}` },
@@ -84,21 +123,47 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
   }
 
+  // Per-key update: aggiorna solo quella singola chiave
+  if (apiKeyId) {
+    const { error: keyError } = await supabaseAdmin
+      .from('api_keys')
+      .update(updates)
+      .eq('id', apiKeyId)
+      .eq('user_id', userId)
+
+    if (keyError) {
+      return NextResponse.json(
+        { error: 'Failed to update key settings: ' + keyError.message },
+        { status: 500 }
+      )
+    }
+    return NextResponse.json({ success: true, scope: 'api_key', api_key_id: apiKeyId, ...updates })
+  }
+
+  // Global update: aggiorna profilo + tutte le key attive
   const { error: profileError } = await supabaseAdmin
     .from('profiles')
     .update(updates)
     .eq('id', userId)
 
   if (profileError) {
-    return NextResponse.json({ error: 'Failed to update: ' + profileError.message }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to update profile: ' + profileError.message },
+      { status: 500 }
+    )
   }
 
-  // Sync to api_keys
-  await supabaseAdmin
+  // Sync to all active api_keys
+  const { error: keysError } = await supabaseAdmin
     .from('api_keys')
     .update(updates)
     .eq('user_id', userId)
     .eq('is_active', true)
 
-  return NextResponse.json({ success: true, ...updates })
+  if (keysError) {
+    // Non-fatal: profilo aggiornato, keys no
+    console.error('Failed to sync routing to api_keys:', keysError.message)
+  }
+
+  return NextResponse.json({ success: true, scope: 'global', ...updates })
 }

@@ -17,25 +17,49 @@ interface ChatMessage {
 
 /** Tier di modelli, dal più economico al più costoso */
 const MODEL_TIERS: Record<string, number> = {
+  // Tier 1 — Economici
   'gpt-4o-mini': 1,
+  'gpt-4.1-nano': 1,
   'gpt-4.1-mini': 1,
-  'gpt-5.4': 2,
+  'gpt-5-nano': 1,
+  // Tier 2 — Bilanciati
+  'gpt-4o': 2,
+  'gpt-4.1': 2,
+  'gpt-5-mini': 2,
+  // Tier 3 — Premium
+  'gpt-5': 3,
+  'gpt-5.4': 3,
   'gpt-5.4-pro': 3,
 }
 
-/** Costo approssimativo per 1K token di input per modello */
+/** Costo approssimativo per 1K token di input per modello ($/1K input) */
 const MODEL_INPUT_COST: Record<string, number> = {
   'gpt-4o-mini': 0.00015,
-  'gpt-4.1-mini': 0.00060,
+  'gpt-4.1-nano': 0.00010,
+  'gpt-4.1-mini': 0.00040,
+  'gpt-5-nano': 0.00015,
+  'gpt-4o': 0.0025,
+  'gpt-4.1': 0.0020,
+  'gpt-5-mini': 0.00125,
+  'gpt-5': 0.0050,
   'gpt-5.4': 0.0025,
   'gpt-5.4-pro': 0.0100,
 }
 
-/** Tutti i modelli disponibili con metadata per l frontend */
+/** Tutti i modelli disponibili con metadata per il frontend */
 export const AVAILABLE_MODELS = [
+  // Tier 1 — Economici
+  { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano', tier: 1, tierLabel: 'Economico', color: 'green' },
   { id: 'gpt-4o-mini', name: 'GPT-4o Mini', tier: 1, tierLabel: 'Economico', color: 'green' },
   { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', tier: 1, tierLabel: 'Economico', color: 'green' },
-  { id: 'gpt-5.4', name: 'GPT-5.4', tier: 2, tierLabel: 'Bilanciato', color: 'yellow' },
+  { id: 'gpt-5-nano', name: 'GPT-5 Nano', tier: 1, tierLabel: 'Economico', color: 'green' },
+  // Tier 2 — Bilanciati
+  { id: 'gpt-5-mini', name: 'GPT-5 Mini', tier: 2, tierLabel: 'Bilanciato', color: 'yellow' },
+  { id: 'gpt-4.1', name: 'GPT-4.1', tier: 2, tierLabel: 'Bilanciato', color: 'yellow' },
+  { id: 'gpt-4o', name: 'GPT-4o', tier: 2, tierLabel: 'Bilanciato', color: 'yellow' },
+  // Tier 3 — Premium
+  { id: 'gpt-5', name: 'GPT-5', tier: 3, tierLabel: 'Premium', color: 'red' },
+  { id: 'gpt-5.4', name: 'GPT-5.4', tier: 3, tierLabel: 'Premium', color: 'red' },
   { id: 'gpt-5.4-pro', name: 'GPT-5.4 Pro', tier: 3, tierLabel: 'Premium', color: 'red' },
 ]
 

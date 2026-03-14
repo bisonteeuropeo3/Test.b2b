@@ -68,18 +68,29 @@ export default function SettingsPage() {
     const [compressionModel, setCompressionModel] = useState('gpt-4o-mini')
     const [compressionThreshold, setCompressionThreshold] = useState(2000)
     const [isSavingCompression, setIsSavingCompression] = useState(false)
+    const [selectedKeyId, setSelectedKeyId] = useState<string | null>(null)
     const router = useRouter()
 
     const AVAILABLE_MODELS = [
+        // Tier 1 — Economici
+        { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano', tier: 1, tierLabel: 'Economico', color: 'green' },
         { id: 'gpt-4o-mini', name: 'GPT-4o Mini', tier: 1, tierLabel: 'Economico', color: 'green' },
         { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', tier: 1, tierLabel: 'Economico', color: 'green' },
-        { id: 'gpt-5.4', name: 'GPT-5.4', tier: 2, tierLabel: 'Bilanciato', color: 'yellow' },
+        { id: 'gpt-5-nano', name: 'GPT-5 Nano', tier: 1, tierLabel: 'Economico', color: 'green' },
+        // Tier 2 — Bilanciati
+        { id: 'gpt-5-mini', name: 'GPT-5 Mini', tier: 2, tierLabel: 'Bilanciato', color: 'yellow' },
+        { id: 'gpt-4.1', name: 'GPT-4.1', tier: 2, tierLabel: 'Bilanciato', color: 'yellow' },
+        { id: 'gpt-4o', name: 'GPT-4o', tier: 2, tierLabel: 'Bilanciato', color: 'yellow' },
+        // Tier 3 — Premium
+        { id: 'gpt-5', name: 'GPT-5', tier: 3, tierLabel: 'Premium', color: 'red' },
+        { id: 'gpt-5.4', name: 'GPT-5.4', tier: 3, tierLabel: 'Premium', color: 'red' },
         { id: 'gpt-5.4-pro', name: 'GPT-5.4 Pro', tier: 3, tierLabel: 'Premium', color: 'red' },
     ]
 
     const CLASSIFIER_MODELS = [
+        { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano (più economico)', cost: '$0.0001/1K' },
         { id: 'gpt-4o-mini', name: 'GPT-4o Mini (consigliato)', cost: '$0.00015/1K' },
-        { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', cost: '$0.0006/1K' },
+        { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', cost: '$0.0004/1K' },
     ]
 
     const THRESHOLD_OPTIONS = [
@@ -187,9 +198,10 @@ export default function SettingsPage() {
         }
     }
 
-    async function loadRoutingSettings() {
+    async function loadRoutingSettings(keyId?: string | null) {
         try {
-            const response = await fetch('/api/settings/routing', { headers: authHeaders() })
+            const url = keyId ? `/api/settings/routing?api_key_id=${keyId}` : '/api/settings/routing'
+            const response = await fetch(url, { headers: authHeaders() })
             if (response.ok) {
                 const data = await response.json()
                 setRoutingEnabled(data.routing_enabled || false)
@@ -202,15 +214,18 @@ export default function SettingsPage() {
     async function updateRoutingSettings(updates: Record<string, any>) {
         setIsSavingRouting(true)
         try {
+            const payload = selectedKeyId ? { ...updates, api_key_id: selectedKeyId } : updates
             const response = await fetch('/api/settings/routing', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', ...authHeaders() },
-                body: JSON.stringify(updates)
+                body: JSON.stringify(payload)
             })
             if (response.ok) {
-                showNotification('success', 'Impostazioni routing aggiornate')
+                const scope = selectedKeyId ? 'chiave selezionata' : 'tutte le chiavi'
+                showNotification('success', `Routing aggiornato (${scope})`)
             } else {
-                showNotification('error', 'Errore nel salvataggio')
+                const errData = await response.json().catch(() => ({}))
+                showNotification('error', errData.error || 'Errore nel salvataggio')
             }
         } catch {
             showNotification('error', 'Errore di connessione')
@@ -219,9 +234,10 @@ export default function SettingsPage() {
         }
     }
 
-    async function loadCompressionSettings() {
+    async function loadCompressionSettings(keyId?: string | null) {
         try {
-            const response = await fetch('/api/settings/compression', { headers: authHeaders() })
+            const url = keyId ? `/api/settings/compression?api_key_id=${keyId}` : '/api/settings/compression'
+            const response = await fetch(url, { headers: authHeaders() })
             if (response.ok) {
                 const data = await response.json()
                 setCompressionEnabled(data.compression_enabled || false)
@@ -234,15 +250,18 @@ export default function SettingsPage() {
     async function updateCompressionSettings(updates: Record<string, any>) {
         setIsSavingCompression(true)
         try {
+            const payload = selectedKeyId ? { ...updates, api_key_id: selectedKeyId } : updates
             const response = await fetch('/api/settings/compression', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', ...authHeaders() },
-                body: JSON.stringify(updates)
+                body: JSON.stringify(payload)
             })
             if (response.ok) {
-                showNotification('success', 'Impostazioni compressione aggiornate')
+                const scope = selectedKeyId ? 'chiave selezionata' : 'tutte le chiavi'
+                showNotification('success', `Compressione aggiornata (${scope})`)
             } else {
-                showNotification('error', 'Errore nel salvataggio')
+                const errData = await response.json().catch(() => ({}))
+                showNotification('error', errData.error || 'Errore nel salvataggio')
             }
         } catch {
             showNotification('error', 'Errore di connessione')
@@ -949,6 +968,37 @@ export default function SettingsPage() {
                                 {routingEnabled ? 'Attivo' : 'Disattivato'}
                             </span>
                         </div>
+                    </div>
+
+                    {/* Per-key selector */}
+                    <div className="bg-[#111] border-2 border-[#222] p-4 mb-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <div className="text-[10px] font-bold uppercase tracking-widest text-[#555] mb-1">Applica a</div>
+                                <div className="text-[#999] text-[10px] font-sans">Scegli se configurare per tutte le chiavi o per una singola chiave API</div>
+                            </div>
+                            <select
+                                value={selectedKeyId || ''}
+                                onChange={(e) => {
+                                    const val = e.target.value || null
+                                    setSelectedKeyId(val)
+                                    loadRoutingSettings(val)
+                                    loadCompressionSettings(val)
+                                }}
+                                className="bg-[#0F0F0F] border-2 border-[#333] text-white px-3 py-2 text-xs font-mono focus:outline-none focus:border-[#FFD700] min-w-[220px]"
+                            >
+                                <option value="">🌐 Tutte le chiavi (globale)</option>
+                                {apiKeys.filter(k => k.isActive).map((k) => (
+                                    <option key={k.id} value={k.id}>🔑 {k.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                        {selectedKeyId && (
+                            <div className="mt-2 text-[10px] text-amber-400 font-bold uppercase flex items-center gap-1">
+                                <AlertTriangle size={10} />
+                                Le modifiche verranno applicate SOLO alla chiave selezionata
+                            </div>
+                        )}
                     </div>
 
                     <div className="bg-cyan-500/5 border-2 border-cyan-500/20 p-4 mb-6">

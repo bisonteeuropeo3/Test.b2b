@@ -18,12 +18,43 @@ async function getUserIdFromToken(request: NextRequest): Promise<string | null> 
   return user.id
 }
 
-/** GET /api/settings/compression — Read current compression settings */
+const VALID_MODELS = [
+  'gpt-4o-mini', 'gpt-4.1-mini', 'gpt-4.1-nano', 'gpt-4.1',
+  'gpt-4o', 'gpt-5-mini', 'gpt-5-nano',
+  'gpt-5', 'gpt-5.4', 'gpt-5.4-pro',
+]
+
+/**
+ * GET /api/settings/compression?api_key_id=xxx
+ * Se api_key_id è presente, legge le impostazioni della singola chiave.
+ * Altrimenti legge i defaults dal profilo utente.
+ */
 export async function GET(request: NextRequest) {
   const userId = await getUserIdFromToken(request)
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!supabaseAdmin) return NextResponse.json({ error: 'Server not configured' }, { status: 500 })
 
+  const apiKeyId = request.nextUrl.searchParams.get('api_key_id')
+
+  // Per-key settings
+  if (apiKeyId) {
+    const { data: keyData } = await supabaseAdmin
+      .from('api_keys')
+      .select('compression_enabled, compression_model, compression_threshold')
+      .eq('id', apiKeyId)
+      .eq('user_id', userId)
+      .single()
+
+    if (keyData) {
+      return NextResponse.json({
+        compression_enabled: keyData.compression_enabled ?? false,
+        compression_model: keyData.compression_model ?? 'gpt-4o-mini',
+        compression_threshold: keyData.compression_threshold ?? 2000,
+      })
+    }
+  }
+
+  // Fallback: profile defaults
   const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('compression_enabled, compression_model, compression_threshold')
@@ -37,16 +68,24 @@ export async function GET(request: NextRequest) {
   })
 }
 
-/** PATCH /api/settings/compression — Update compression settings */
+/**
+ * PATCH /api/settings/compression
+ * Body opzionale: api_key_id per aggiornare una singola chiave.
+ * Senza api_key_id aggiorna il profilo e tutte le active keys.
+ */
 export async function PATCH(request: NextRequest) {
   const userId = await getUserIdFromToken(request)
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!supabaseAdmin) return NextResponse.json({ error: 'Server not configured' }, { status: 500 })
 
-  const body = await request.json()
-  const validModels = [
-    'gpt-4o-mini', 'gpt-4.1-mini', 'gpt-5.4', 'gpt-5.4-pro'
-  ]
+  let body: Record<string, any>
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  const apiKeyId = body.api_key_id as string | undefined
   const validThresholds = [500, 1000, 2000, 4000, 8000]
   const updates: Record<string, any> = {}
 
@@ -55,9 +94,9 @@ export async function PATCH(request: NextRequest) {
   }
 
   if (typeof body.compression_model === 'string') {
-    if (!validModels.includes(body.compression_model)) {
+    if (!VALID_MODELS.includes(body.compression_model)) {
       return NextResponse.json(
-        { error: `Model must be one of: ${validModels.join(', ')}` },
+        { error: `Model must be one of: ${VALID_MODELS.join(', ')}` },
         { status: 400 }
       )
     }
@@ -78,21 +117,45 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
   }
 
+  // Per-key update
+  if (apiKeyId) {
+    const { error: keyError } = await supabaseAdmin
+      .from('api_keys')
+      .update(updates)
+      .eq('id', apiKeyId)
+      .eq('user_id', userId)
+
+    if (keyError) {
+      return NextResponse.json(
+        { error: 'Failed to update key settings: ' + keyError.message },
+        { status: 500 }
+      )
+    }
+    return NextResponse.json({ success: true, scope: 'api_key', api_key_id: apiKeyId, ...updates })
+  }
+
+  // Global update: profilo + tutte le key attive
   const { error: profileError } = await supabaseAdmin
     .from('profiles')
     .update(updates)
     .eq('id', userId)
 
   if (profileError) {
-    return NextResponse.json({ error: 'Failed to update: ' + profileError.message }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to update profile: ' + profileError.message },
+      { status: 500 }
+    )
   }
 
-  // Sync to api_keys
-  await supabaseAdmin
+  const { error: keysError } = await supabaseAdmin
     .from('api_keys')
     .update(updates)
     .eq('user_id', userId)
     .eq('is_active', true)
 
-  return NextResponse.json({ success: true, ...updates })
+  if (keysError) {
+    console.error('Failed to sync compression to api_keys:', keysError.message)
+  }
+
+  return NextResponse.json({ success: true, scope: 'global', ...updates })
 }
