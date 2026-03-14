@@ -952,8 +952,137 @@ export default function SettingsPage() {
                     </div>
                 </section>
 
-                {/* Model Router Agent Section */}
+
+                {/* ═══════════════════════════════════════════════════════ */}
+                {/* AGENTIC SETTINGS — Mode Selector                        */}
+                {/* ═══════════════════════════════════════════════════════ */}
                 <section className="mb-8">
+                    <div className="flex items-center gap-3 mb-6">
+                        <Route size={20} className="text-[#FFD700]" />
+                        <h2 className="text-xl font-black uppercase italic">Impostazioni Agentiche</h2>
+                    </div>
+
+                    {/* ── MODE SWITCHER ── */}
+                    <div className="grid grid-cols-2 gap-0 mb-6">
+                        <button
+                            onClick={() => {
+                                setSelectedKeyId(null)
+                                loadRoutingSettings(null)
+                                loadCompressionSettings(null)
+                            }}
+                            className={`p-5 border-2 transition-all text-left ${
+                                !selectedKeyId
+                                    ? 'border-[#FFD700] bg-[#FFD700]/10 border-r-0'
+                                    : 'border-[#222] bg-[#0A0A0A] hover:bg-[#111] border-r-0'
+                            }`}
+                        >
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className={`w-8 h-8 flex items-center justify-center text-lg ${
+                                    !selectedKeyId ? 'bg-[#FFD700] text-black' : 'bg-[#222] text-[#555]'
+                                }`}>🌐</div>
+                                <div>
+                                    <div className={`font-black uppercase text-sm ${!selectedKeyId ? 'text-[#FFD700]' : 'text-[#777]'}`}>
+                                        Globale
+                                    </div>
+                                    <div className="text-[10px] text-[#555] font-bold uppercase tracking-widest">Tutte le chiavi</div>
+                                </div>
+                            </div>
+                            <p className="text-[#999] text-[10px] font-sans leading-relaxed">
+                                Le stesse impostazioni si applicano a <strong className="text-white">tutte le chiavi API</strong> del tuo account.
+                            </p>
+                        </button>
+                        <button
+                            onClick={() => {
+                                const firstKey = apiKeys.find(k => k.isActive)
+                                if (firstKey) {
+                                    setSelectedKeyId(firstKey.id)
+                                    loadRoutingSettings(firstKey.id)
+                                    loadCompressionSettings(firstKey.id)
+                                }
+                            }}
+                            className={`p-5 border-2 transition-all text-left ${
+                                selectedKeyId
+                                    ? 'border-purple-500 bg-purple-500/10'
+                                    : 'border-[#222] bg-[#0A0A0A] hover:bg-[#111]'
+                            }`}
+                        >
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className={`w-8 h-8 flex items-center justify-center text-lg ${
+                                    selectedKeyId ? 'bg-purple-500 text-white' : 'bg-[#222] text-[#555]'
+                                }`}>🔑</div>
+                                <div>
+                                    <div className={`font-black uppercase text-sm ${selectedKeyId ? 'text-purple-400' : 'text-[#777]'}`}>
+                                        Custom
+                                    </div>
+                                    <div className="text-[10px] text-[#555] font-bold uppercase tracking-widest">Per singola chiave</div>
+                                </div>
+                            </div>
+                            <p className="text-[#999] text-[10px] font-sans leading-relaxed">
+                                Configura impostazioni <strong className="text-white">diverse per ogni chiave API</strong>. Ideale per ambienti separati.
+                            </p>
+                        </button>
+                    </div>
+
+                    {/* ── CUSTOM: Key Tabs ── */}
+                    {selectedKeyId && (
+                        <div className="mb-6">
+                            <div className="flex items-center gap-2 mb-3">
+                                <div className="text-[10px] font-bold uppercase tracking-widest text-purple-400">Seleziona chiave da configurare:</div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {apiKeys.filter(k => k.isActive).map((k) => (
+                                    <button
+                                        key={k.id}
+                                        onClick={() => {
+                                            setSelectedKeyId(k.id)
+                                            loadRoutingSettings(k.id)
+                                            loadCompressionSettings(k.id)
+                                        }}
+                                        className={`px-4 py-2 border-2 transition-all flex items-center gap-2 ${
+                                            selectedKeyId === k.id
+                                                ? 'border-purple-500 bg-purple-500/15 text-purple-300'
+                                                : 'border-[#222] bg-[#0F0F0F] text-[#777] hover:border-[#444] hover:text-white'
+                                        }`}
+                                    >
+                                        <Key size={12} />
+                                        <span className="text-xs font-bold uppercase">{k.label}</span>
+                                        {selectedKeyId === k.id && (
+                                            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── ACTIVE SCOPE BANNER ── */}
+                    <div className={`p-3 mb-6 flex items-center gap-3 ${
+                        selectedKeyId
+                            ? 'bg-purple-500/10 border-2 border-purple-500/30'
+                            : 'bg-[#FFD700]/5 border-2 border-[#FFD700]/20'
+                    }`}>
+                        {selectedKeyId ? (
+                            <>
+                                <AlertTriangle size={16} className="text-purple-400 shrink-0" />
+                                <div className="text-purple-300 text-xs font-sans">
+                                    Stai configurando <strong className="font-bold text-purple-200">
+                                        {apiKeys.find(k => k.id === selectedKeyId)?.label || 'Chiave'}
+                                    </strong> — le modifiche si applicano SOLO a questa chiave API
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <Zap size={16} className="text-[#FFD700] shrink-0" />
+                                <div className="text-[#ccc] text-xs font-sans">
+                                    Modalità <strong className="font-bold text-[#FFD700]">Globale</strong> — ogni modifica si applica a tutte le tue chiavi API
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </section>
+
+                {/* ═══ Model Router Agent Section ═══ */}
+                <section className={`mb-8 ${selectedKeyId ? 'border-l-4 border-purple-500/30 pl-4' : ''}`}>
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
                             <Route size={20} className="text-[#FFD700]" />
@@ -968,37 +1097,6 @@ export default function SettingsPage() {
                                 {routingEnabled ? 'Attivo' : 'Disattivato'}
                             </span>
                         </div>
-                    </div>
-
-                    {/* Per-key selector */}
-                    <div className="bg-[#111] border-2 border-[#222] p-4 mb-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <div className="text-[10px] font-bold uppercase tracking-widest text-[#555] mb-1">Applica a</div>
-                                <div className="text-[#999] text-[10px] font-sans">Scegli se configurare per tutte le chiavi o per una singola chiave API</div>
-                            </div>
-                            <select
-                                value={selectedKeyId || ''}
-                                onChange={(e) => {
-                                    const val = e.target.value || null
-                                    setSelectedKeyId(val)
-                                    loadRoutingSettings(val)
-                                    loadCompressionSettings(val)
-                                }}
-                                className="bg-[#0F0F0F] border-2 border-[#333] text-white px-3 py-2 text-xs font-mono focus:outline-none focus:border-[#FFD700] min-w-[220px]"
-                            >
-                                <option value="">🌐 Tutte le chiavi (globale)</option>
-                                {apiKeys.filter(k => k.isActive).map((k) => (
-                                    <option key={k.id} value={k.id}>🔑 {k.label}</option>
-                                ))}
-                            </select>
-                        </div>
-                        {selectedKeyId && (
-                            <div className="mt-2 text-[10px] text-amber-400 font-bold uppercase flex items-center gap-1">
-                                <AlertTriangle size={10} />
-                                Le modifiche verranno applicate SOLO alla chiave selezionata
-                            </div>
-                        )}
                     </div>
 
                     <div className="bg-cyan-500/5 border-2 border-cyan-500/20 p-4 mb-6">
@@ -1041,7 +1139,7 @@ export default function SettingsPage() {
                                 <div className="border-t border-[#222] pt-6">
                                     <div className="font-black uppercase text-sm mb-2">Modello Classificatore</div>
                                     <div className="text-[#777] text-xs font-sans mb-4">Modello economico usato dall&apos;agente per analizzare la complessità della richiesta</div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                         {CLASSIFIER_MODELS.map((m) => (
                                             <button
                                                 key={m.id}
@@ -1141,8 +1239,8 @@ export default function SettingsPage() {
                     </div>
                 </section>
 
-                {/* Prompt Compression Section */}
-                <section className="mb-8">
+                {/* ═══ Prompt Compression Section ═══ */}
+                <section className={`mb-8 ${selectedKeyId ? 'border-l-4 border-purple-500/30 pl-4' : ''}`}>
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
                             <Minimize2 size={20} className="text-[#FFD700]" />
@@ -1199,7 +1297,7 @@ export default function SettingsPage() {
                                 <div className="border-t border-[#222] pt-6">
                                     <div className="font-black uppercase text-sm mb-2">Modello Compressore</div>
                                     <div className="text-[#777] text-xs font-sans mb-4">Modello usato per comprimere il contesto. Modelli più economici = costo compressione minore.</div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                         {CLASSIFIER_MODELS.map((m) => (
                                             <button
                                                 key={m.id}
@@ -1271,7 +1369,6 @@ export default function SettingsPage() {
                     </div>
                 </section>
 
-                {/* Account Info */}
                 <section className="mb-8">
                     <div className="flex items-center gap-3 mb-6">
                         <Shield size={20} className="text-[#FFD700]" />
