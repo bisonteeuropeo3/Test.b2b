@@ -45,8 +45,7 @@ export async function PATCH(request: NextRequest) {
 
   const body = await request.json()
   const validModels = [
-    'gpt-4o-mini', 'gpt-3.5-turbo', 'gpt-3.5-turbo-0125', 'gpt-3.5-turbo-1106',
-    'gpt-4o', 'gpt-4-turbo', 'gpt-4-turbo-preview', 'gpt-4',
+    'gpt-4o-mini', 'gpt-4.1-mini', 'gpt-5.4', 'gpt-5.4-pro'
   ]
   const validThresholds = [500, 1000, 2000, 4000, 8000]
   const updates: Record<string, any> = {}

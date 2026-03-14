@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
     let pruningIntensity: PruningIntensity = 'medium'
     let routingEnabled = false
     let routingCheapModel = 'gpt-4o-mini'
-    let routingAllowedModels: string[] = ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']
+    let routingAllowedModels: string[] = ['gpt-4o-mini', 'gpt-5.4', 'gpt-5.4-pro']
     let compressionEnabled = false
     let compressionModel = 'gpt-4o-mini'
     let compressionThreshold = 2000
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
           pruningIntensity = profileByKey.pruning_intensity || 'medium'
           routingEnabled = profileByKey.routing_enabled || false
           routingCheapModel = profileByKey.routing_cheap_model || 'gpt-4o-mini'
-          routingAllowedModels = profileByKey.routing_allowed_models || ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']
+          routingAllowedModels = profileByKey.routing_allowed_models || ['gpt-4o-mini', 'gpt-5.4', 'gpt-5.4-pro']
           compressionEnabled = profileByKey.compression_enabled || false
           compressionModel = profileByKey.compression_model || 'gpt-4o-mini'
           compressionThreshold = profileByKey.compression_threshold || 2000
@@ -234,7 +234,7 @@ export async function POST(request: NextRequest) {
         pruningIntensity = profileEntry.pruning_intensity || 'medium'
         routingEnabled = profileEntry.routing_enabled || false
         routingCheapModel = profileEntry.routing_cheap_model || 'gpt-4o-mini'
-        routingAllowedModels = profileEntry.routing_allowed_models || ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']
+        routingAllowedModels = profileEntry.routing_allowed_models || ['gpt-4o-mini', 'gpt-5.4', 'gpt-5.4-pro']
         compressionEnabled = profileEntry.compression_enabled || false
         compressionModel = profileEntry.compression_model || 'gpt-4o-mini'
         compressionThreshold = profileEntry.compression_threshold || 2000

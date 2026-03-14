@@ -17,35 +17,26 @@ interface ChatMessage {
 
 /** Tier di modelli, dal più economico al più costoso */
 const MODEL_TIERS: Record<string, number> = {
-  'gpt-3.5-turbo': 1,
-  'gpt-3.5-turbo-0125': 1,
-  'gpt-3.5-turbo-1106': 1,
   'gpt-4o-mini': 1,
-  'gpt-4o': 2,
-  'gpt-4-turbo': 3,
-  'gpt-4-turbo-preview': 3,
-  'gpt-4': 3,
+  'gpt-4.1-mini': 1,
+  'gpt-5.4': 2,
+  'gpt-5.4-pro': 3,
 }
 
 /** Costo approssimativo per 1K token di input per modello */
 const MODEL_INPUT_COST: Record<string, number> = {
-  'gpt-3.5-turbo': 0.0015,
-  'gpt-3.5-turbo-0125': 0.0005,
-  'gpt-3.5-turbo-1106': 0.001,
   'gpt-4o-mini': 0.00015,
-  'gpt-4o': 0.005,
-  'gpt-4-turbo': 0.01,
-  'gpt-4-turbo-preview': 0.01,
-  'gpt-4': 0.03,
+  'gpt-4.1-mini': 0.00060,
+  'gpt-5.4': 0.0025,
+  'gpt-5.4-pro': 0.0100,
 }
 
-/** Tutti i modelli disponibili con metadata per il frontend */
+/** Tutti i modelli disponibili con metadata per l frontend */
 export const AVAILABLE_MODELS = [
   { id: 'gpt-4o-mini', name: 'GPT-4o Mini', tier: 1, tierLabel: 'Economico', color: 'green' },
-  { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', tier: 1, tierLabel: 'Economico', color: 'green' },
-  { id: 'gpt-4o', name: 'GPT-4o', tier: 2, tierLabel: 'Bilanciato', color: 'yellow' },
-  { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', tier: 3, tierLabel: 'Premium', color: 'red' },
-  { id: 'gpt-4', name: 'GPT-4', tier: 3, tierLabel: 'Premium', color: 'red' },
+  { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', tier: 1, tierLabel: 'Economico', color: 'green' },
+  { id: 'gpt-5.4', name: 'GPT-5.4', tier: 2, tierLabel: 'Bilanciato', color: 'yellow' },
+  { id: 'gpt-5.4-pro', name: 'GPT-5.4 Pro', tier: 3, tierLabel: 'Premium', color: 'red' },
 ]
 
 export interface RoutingResult {

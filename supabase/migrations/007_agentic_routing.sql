@@ -9,12 +9,12 @@
 ALTER TABLE profiles
 ADD COLUMN IF NOT EXISTS routing_enabled BOOLEAN DEFAULT false,
 ADD COLUMN IF NOT EXISTS routing_cheap_model TEXT DEFAULT 'gpt-4o-mini',
-ADD COLUMN IF NOT EXISTS routing_allowed_models JSONB DEFAULT '["gpt-4o-mini","gpt-4o","gpt-4-turbo"]'::jsonb;
+ADD COLUMN IF NOT EXISTS routing_allowed_models JSONB DEFAULT '["gpt-4o-mini","gpt-4.1-mini","gpt-5.4","gpt-5.4-pro"]'::jsonb;
 
 ALTER TABLE api_keys
 ADD COLUMN IF NOT EXISTS routing_enabled BOOLEAN DEFAULT false,
 ADD COLUMN IF NOT EXISTS routing_cheap_model TEXT DEFAULT 'gpt-4o-mini',
-ADD COLUMN IF NOT EXISTS routing_allowed_models JSONB DEFAULT '["gpt-4o-mini","gpt-4o","gpt-4-turbo"]'::jsonb;
+ADD COLUMN IF NOT EXISTS routing_allowed_models JSONB DEFAULT '["gpt-4o-mini","gpt-4.1-mini","gpt-5.4","gpt-5.4-pro"]'::jsonb;
 
 COMMENT ON COLUMN profiles.routing_enabled IS 'Se abilitato, un agente AI sceglie automaticamente il modello più economico adatto alla richiesta';
 COMMENT ON COLUMN profiles.routing_cheap_model IS 'Modello economico usato dall agente per classificare la complessità della richiesta';

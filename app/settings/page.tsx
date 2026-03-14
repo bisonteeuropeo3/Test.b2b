@@ -62,7 +62,7 @@ export default function SettingsPage() {
     const [isSavingPruning, setIsSavingPruning] = useState(false)
     const [routingEnabled, setRoutingEnabled] = useState(false)
     const [routingCheapModel, setRoutingCheapModel] = useState('gpt-4o-mini')
-    const [routingAllowedModels, setRoutingAllowedModels] = useState<string[]>(['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'])
+    const [routingAllowedModels, setRoutingAllowedModels] = useState<string[]>(['gpt-4o-mini', 'gpt-5.4', 'gpt-5.4-pro'])
     const [isSavingRouting, setIsSavingRouting] = useState(false)
     const [compressionEnabled, setCompressionEnabled] = useState(false)
     const [compressionModel, setCompressionModel] = useState('gpt-4o-mini')
@@ -72,15 +72,14 @@ export default function SettingsPage() {
 
     const AVAILABLE_MODELS = [
         { id: 'gpt-4o-mini', name: 'GPT-4o Mini', tier: 1, tierLabel: 'Economico', color: 'green' },
-        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', tier: 1, tierLabel: 'Economico', color: 'green' },
-        { id: 'gpt-4o', name: 'GPT-4o', tier: 2, tierLabel: 'Bilanciato', color: 'yellow' },
-        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', tier: 3, tierLabel: 'Premium', color: 'red' },
-        { id: 'gpt-4', name: 'GPT-4', tier: 3, tierLabel: 'Premium', color: 'red' },
+        { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', tier: 1, tierLabel: 'Economico', color: 'green' },
+        { id: 'gpt-5.4', name: 'GPT-5.4', tier: 2, tierLabel: 'Bilanciato', color: 'yellow' },
+        { id: 'gpt-5.4-pro', name: 'GPT-5.4 Pro', tier: 3, tierLabel: 'Premium', color: 'red' },
     ]
 
     const CLASSIFIER_MODELS = [
         { id: 'gpt-4o-mini', name: 'GPT-4o Mini (consigliato)', cost: '$0.00015/1K' },
-        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', cost: '$0.0015/1K' },
+        { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', cost: '$0.0006/1K' },
     ]
 
     const THRESHOLD_OPTIONS = [
@@ -195,7 +194,7 @@ export default function SettingsPage() {
                 const data = await response.json()
                 setRoutingEnabled(data.routing_enabled || false)
                 setRoutingCheapModel(data.routing_cheap_model || 'gpt-4o-mini')
-                setRoutingAllowedModels(data.routing_allowed_models || ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'])
+                setRoutingAllowedModels(data.routing_allowed_models || ['gpt-4o-mini', 'gpt-5.4', 'gpt-5.4-pro'])
             }
         } catch { /* defaults */ }
     }
