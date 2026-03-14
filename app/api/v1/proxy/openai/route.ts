@@ -8,6 +8,8 @@ import {
   updateCacheHit,
 } from '@/lib/embedding'
 import { pruneMessages, PruningIntensity } from '@/lib/pruning'
+import { routeToOptimalModel } from '@/lib/model-router'
+import { compressPrompt } from '@/lib/prompt-compressor'
 
 // Initialize Supabase admin client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -128,11 +130,17 @@ export async function POST(request: NextRequest) {
     let semanticCacheTtl = 60
     let pruningEnabled = false
     let pruningIntensity: PruningIntensity = 'medium'
+    let routingEnabled = false
+    let routingCheapModel = 'gpt-4o-mini'
+    let routingAllowedModels: string[] = ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']
+    let compressionEnabled = false
+    let compressionModel = 'gpt-4o-mini'
+    let compressionThreshold = 2000
 
     // 1. Check api_keys table (standalone keys)
     const { data: apiKeyEntry } = await supabaseAdmin
       .from('api_keys')
-      .select('id, user_id, monthly_budget, is_active, semantic_cache_enabled, semantic_cache_ttl_minutes, pruning_enabled, pruning_intensity')
+      .select('id, user_id, monthly_budget, is_active, semantic_cache_enabled, semantic_cache_ttl_minutes, pruning_enabled, pruning_intensity, routing_enabled, routing_cheap_model, routing_allowed_models, compression_enabled, compression_model, compression_threshold')
       .eq('api_key', tokenGuardKey)
       .eq('is_active', true)
       .single()
@@ -145,7 +153,7 @@ export async function POST(request: NextRequest) {
         // Key exists but no user_id: try to find matching profile by api_key
         const { data: profileByKey } = await supabaseAdmin
           .from('profiles')
-          .select('id, monthly_budget, semantic_cache_enabled, semantic_cache_ttl_minutes, pruning_enabled, pruning_intensity')
+          .select('id, monthly_budget, semantic_cache_enabled, semantic_cache_ttl_minutes, pruning_enabled, pruning_intensity, routing_enabled, routing_cheap_model, routing_allowed_models, compression_enabled, compression_model, compression_threshold')
           .eq('api_key', tokenGuardKey)
           .single()
 
@@ -157,6 +165,12 @@ export async function POST(request: NextRequest) {
           semanticCacheTtl = profileByKey.semantic_cache_ttl_minutes || 60
           pruningEnabled = profileByKey.pruning_enabled || false
           pruningIntensity = profileByKey.pruning_intensity || 'medium'
+          routingEnabled = profileByKey.routing_enabled || false
+          routingCheapModel = profileByKey.routing_cheap_model || 'gpt-4o-mini'
+          routingAllowedModels = profileByKey.routing_allowed_models || ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']
+          compressionEnabled = profileByKey.compression_enabled || false
+          compressionModel = profileByKey.compression_model || 'gpt-4o-mini'
+          compressionThreshold = profileByKey.compression_threshold || 2000
           supabaseAdmin.from('api_keys')
             .update({ user_id: profileByKey.id, last_used_at: new Date().toISOString() })
             .eq('id', apiKeyEntry.id)
@@ -185,11 +199,29 @@ export async function POST(request: NextRequest) {
       if (apiKeyEntry.pruning_intensity) {
         pruningIntensity = apiKeyEntry.pruning_intensity
       }
+      if (apiKeyEntry.routing_enabled !== undefined && apiKeyEntry.routing_enabled !== null) {
+        routingEnabled = apiKeyEntry.routing_enabled
+      }
+      if (apiKeyEntry.routing_cheap_model) {
+        routingCheapModel = apiKeyEntry.routing_cheap_model
+      }
+      if (apiKeyEntry.routing_allowed_models) {
+        routingAllowedModels = apiKeyEntry.routing_allowed_models
+      }
+      if (apiKeyEntry.compression_enabled !== undefined && apiKeyEntry.compression_enabled !== null) {
+        compressionEnabled = apiKeyEntry.compression_enabled
+      }
+      if (apiKeyEntry.compression_model) {
+        compressionModel = apiKeyEntry.compression_model
+      }
+      if (apiKeyEntry.compression_threshold) {
+        compressionThreshold = apiKeyEntry.compression_threshold
+      }
     } else {
       // 2. Fallback: check profiles table (keys created via Supabase Auth signup)
       const { data: profileEntry } = await supabaseAdmin
         .from('profiles')
-        .select('id, monthly_budget, api_key, semantic_cache_enabled, semantic_cache_ttl_minutes, pruning_enabled, pruning_intensity')
+        .select('id, monthly_budget, api_key, semantic_cache_enabled, semantic_cache_ttl_minutes, pruning_enabled, pruning_intensity, routing_enabled, routing_cheap_model, routing_allowed_models, compression_enabled, compression_model, compression_threshold')
         .eq('api_key', tokenGuardKey)
         .single()
 
@@ -200,6 +232,12 @@ export async function POST(request: NextRequest) {
         semanticCacheTtl = profileEntry.semantic_cache_ttl_minutes || 60
         pruningEnabled = profileEntry.pruning_enabled || false
         pruningIntensity = profileEntry.pruning_intensity || 'medium'
+        routingEnabled = profileEntry.routing_enabled || false
+        routingCheapModel = profileEntry.routing_cheap_model || 'gpt-4o-mini'
+        routingAllowedModels = profileEntry.routing_allowed_models || ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']
+        compressionEnabled = profileEntry.compression_enabled || false
+        compressionModel = profileEntry.compression_model || 'gpt-4o-mini'
+        compressionThreshold = profileEntry.compression_threshold || 2000
         // Also sync this key into api_keys table for faster future lookups
         supabaseAdmin.from('api_keys').upsert({
           api_key: tokenGuardKey,
@@ -268,6 +306,43 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── STEP 0.5: Prompt Compression (if enabled) ──
+    let compressionResult = null
+    if (compressionEnabled && apiKey && body.messages && body.messages.length > 0) {
+      try {
+        compressionResult = await compressPrompt(
+          body.messages,
+          compressionModel,
+          compressionThreshold,
+          apiKey
+        )
+        if (compressionResult.compressed) {
+          body.messages = compressionResult.messages
+        }
+      } catch (compressionError) {
+        console.error('Compression error, continuing with original messages:', compressionError)
+      }
+    }
+
+    // ── STEP 0.7: Dynamic Model Routing (if enabled) ──
+    let routingResult = null
+    if (routingEnabled && apiKey && body.model && body.messages) {
+      try {
+        routingResult = await routeToOptimalModel(
+          body.messages,
+          body.model,
+          routingAllowedModels,
+          routingCheapModel,
+          apiKey
+        )
+        if (routingResult.wasRouted) {
+          body.model = routingResult.selectedModel
+        }
+      } catch (routingError) {
+        console.error('Routing error, continuing with original model:', routingError)
+      }
+    }
+
     // Generate prompt hash for duplicate detection (existing hash cache)
     const promptHash = generatePromptHash(body)
     const cacheKey = `${userData.id}:${promptHash}`
@@ -297,6 +372,16 @@ export async function POST(request: NextRequest) {
             pruned: true,
             pruning_intensity: pruningIntensity,
             tokens_saved_by_pruning: pruningResult.estimatedTokensSaved,
+          }),
+          ...(compressionResult?.compressed && {
+            compressed: true,
+            tokens_saved_by_compression: compressionResult.tokensSaved,
+          }),
+          ...(routingResult?.wasRouted && {
+            routed: true,
+            original_model: routingResult.originalModel,
+            selected_model: routingResult.selectedModel,
+            routing_savings_percent: routingResult.estimatedSavings,
           }),
         }
       }, { headers: corsHeaders })
@@ -343,6 +428,16 @@ export async function POST(request: NextRequest) {
                   pruned: true,
                   pruning_intensity: pruningIntensity,
                   tokens_saved_by_pruning: pruningResult.estimatedTokensSaved,
+                }),
+                ...(compressionResult?.compressed && {
+                  compressed: true,
+                  tokens_saved_by_compression: compressionResult.tokensSaved,
+                }),
+                ...(routingResult?.wasRouted && {
+                  routed: true,
+                  original_model: routingResult.originalModel,
+                  selected_model: routingResult.selectedModel,
+                  routing_savings_percent: routingResult.estimatedSavings,
                 }),
               }
             }, { headers: corsHeaders })
@@ -419,6 +514,19 @@ export async function POST(request: NextRequest) {
                 original_messages: pruningResult.originalCount,
                 pruned_messages: pruningResult.prunedCount,
               }),
+              ...(compressionResult?.compressed && {
+                compressed: true,
+                tokens_saved_by_compression: compressionResult.tokensSaved,
+                original_tokens: compressionResult.originalTokens,
+                compressed_tokens: compressionResult.compressedTokens,
+              }),
+              ...(routingResult?.wasRouted && {
+                routed: true,
+                original_model: routingResult.originalModel,
+                selected_model: routingResult.selectedModel,
+                routing_savings_percent: routingResult.estimatedSavings,
+                routing_reason: routingResult.reason,
+              }),
             }
           }, { headers: corsHeaders })
         }
@@ -485,6 +593,19 @@ export async function POST(request: NextRequest) {
           tokens_saved_by_pruning: pruningResult.estimatedTokensSaved,
           original_messages: pruningResult.originalCount,
           pruned_messages: pruningResult.prunedCount,
+        }),
+        ...(compressionResult?.compressed && {
+          compressed: true,
+          tokens_saved_by_compression: compressionResult.tokensSaved,
+          original_tokens: compressionResult.originalTokens,
+          compressed_tokens: compressionResult.compressedTokens,
+        }),
+        ...(routingResult?.wasRouted && {
+          routed: true,
+          original_model: routingResult.originalModel,
+          selected_model: routingResult.selectedModel,
+          routing_savings_percent: routingResult.estimatedSavings,
+          routing_reason: routingResult.reason,
         }),
       }
     }, { headers: corsHeaders })

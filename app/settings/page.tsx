@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
     ArrowLeft, Key, Copy, Check, RefreshCw, Trash2,
     Shield, AlertTriangle, Plus, Eye, EyeOff,
-    Database, Clock, Zap, Scissors
+    Database, Clock, Zap, Scissors, Route, Minimize2
 } from 'lucide-react'
 
 function getSessionToken(): string | null {
@@ -60,7 +60,36 @@ export default function SettingsPage() {
     const [pruningEnabled, setPruningEnabled] = useState(false)
     const [pruningIntensity, setPruningIntensity] = useState('medium')
     const [isSavingPruning, setIsSavingPruning] = useState(false)
+    const [routingEnabled, setRoutingEnabled] = useState(false)
+    const [routingCheapModel, setRoutingCheapModel] = useState('gpt-4o-mini')
+    const [routingAllowedModels, setRoutingAllowedModels] = useState<string[]>(['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'])
+    const [isSavingRouting, setIsSavingRouting] = useState(false)
+    const [compressionEnabled, setCompressionEnabled] = useState(false)
+    const [compressionModel, setCompressionModel] = useState('gpt-4o-mini')
+    const [compressionThreshold, setCompressionThreshold] = useState(2000)
+    const [isSavingCompression, setIsSavingCompression] = useState(false)
     const router = useRouter()
+
+    const AVAILABLE_MODELS = [
+        { id: 'gpt-4o-mini', name: 'GPT-4o Mini', tier: 1, tierLabel: 'Economico', color: 'green' },
+        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', tier: 1, tierLabel: 'Economico', color: 'green' },
+        { id: 'gpt-4o', name: 'GPT-4o', tier: 2, tierLabel: 'Bilanciato', color: 'yellow' },
+        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', tier: 3, tierLabel: 'Premium', color: 'red' },
+        { id: 'gpt-4', name: 'GPT-4', tier: 3, tierLabel: 'Premium', color: 'red' },
+    ]
+
+    const CLASSIFIER_MODELS = [
+        { id: 'gpt-4o-mini', name: 'GPT-4o Mini (consigliato)', cost: '$0.00015/1K' },
+        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', cost: '$0.0015/1K' },
+    ]
+
+    const THRESHOLD_OPTIONS = [
+        { value: 500, label: '500 token', desc: 'Molto aggressiva' },
+        { value: 1000, label: '1.000 token', desc: 'Aggressiva' },
+        { value: 2000, label: '2.000 token', desc: 'Bilanciata' },
+        { value: 4000, label: '4.000 token', desc: 'Conservativa' },
+        { value: 8000, label: '8.000 token', desc: 'Solo prompt enormi' },
+    ]
 
     const TTL_OPTIONS = [
         { value: 5, label: '5 minuti', freshness: 100 },
@@ -88,6 +117,8 @@ export default function SettingsPage() {
         loadApiKeys()
         loadCacheSettings()
         loadPruningSettings()
+        loadRoutingSettings()
+        loadCompressionSettings()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -155,6 +186,82 @@ export default function SettingsPage() {
         } finally {
             setIsSavingPruning(false)
         }
+    }
+
+    async function loadRoutingSettings() {
+        try {
+            const response = await fetch('/api/settings/routing', { headers: authHeaders() })
+            if (response.ok) {
+                const data = await response.json()
+                setRoutingEnabled(data.routing_enabled || false)
+                setRoutingCheapModel(data.routing_cheap_model || 'gpt-4o-mini')
+                setRoutingAllowedModels(data.routing_allowed_models || ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'])
+            }
+        } catch { /* defaults */ }
+    }
+
+    async function updateRoutingSettings(updates: Record<string, any>) {
+        setIsSavingRouting(true)
+        try {
+            const response = await fetch('/api/settings/routing', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                body: JSON.stringify(updates)
+            })
+            if (response.ok) {
+                showNotification('success', 'Impostazioni routing aggiornate')
+            } else {
+                showNotification('error', 'Errore nel salvataggio')
+            }
+        } catch {
+            showNotification('error', 'Errore di connessione')
+        } finally {
+            setIsSavingRouting(false)
+        }
+    }
+
+    async function loadCompressionSettings() {
+        try {
+            const response = await fetch('/api/settings/compression', { headers: authHeaders() })
+            if (response.ok) {
+                const data = await response.json()
+                setCompressionEnabled(data.compression_enabled || false)
+                setCompressionModel(data.compression_model || 'gpt-4o-mini')
+                setCompressionThreshold(data.compression_threshold || 2000)
+            }
+        } catch { /* defaults */ }
+    }
+
+    async function updateCompressionSettings(updates: Record<string, any>) {
+        setIsSavingCompression(true)
+        try {
+            const response = await fetch('/api/settings/compression', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                body: JSON.stringify(updates)
+            })
+            if (response.ok) {
+                showNotification('success', 'Impostazioni compressione aggiornate')
+            } else {
+                showNotification('error', 'Errore nel salvataggio')
+            }
+        } catch {
+            showNotification('error', 'Errore di connessione')
+        } finally {
+            setIsSavingCompression(false)
+        }
+    }
+
+    function toggleModelInList(modelId: string) {
+        const newList = routingAllowedModels.includes(modelId)
+            ? routingAllowedModels.filter(m => m !== modelId)
+            : [...routingAllowedModels, modelId]
+        if (newList.length === 0) {
+            showNotification('error', 'Devi selezionare almeno un modello')
+            return
+        }
+        setRoutingAllowedModels(newList)
+        updateRoutingSettings({ routing_allowed_models: newList })
     }
 
     async function loadApiKeys() {
@@ -818,6 +925,294 @@ export default function SettingsPage() {
                                                       pruningIntensity === 'medium' ? '75' : '90'}%
                                                 </div>
                                                 <div className="text-[#555] text-[10px] font-bold uppercase">token risparmiati</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </section>
+
+                {/* Model Router Agent Section */}
+                <section className="mb-8">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <Route size={20} className="text-[#FFD700]" />
+                            <h2 className="text-xl font-black uppercase italic">Model Router Agent</h2>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {isSavingRouting && <RefreshCw size={14} className="animate-spin text-[#555]" />}
+                            <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 ${routingEnabled
+                                ? 'bg-green-500/10 text-green-400 border border-green-500/30'
+                                : 'bg-[#222] text-[#555] border border-[#333]'
+                                }`}>
+                                {routingEnabled ? 'Attivo' : 'Disattivato'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="bg-cyan-500/5 border-2 border-cyan-500/20 p-4 mb-6">
+                        <div className="flex items-start gap-3">
+                            <Route size={18} className="text-cyan-400 shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-cyan-300 text-sm font-sans">
+                                    <strong className="font-bold uppercase">Model Router:</strong> Un agente AI analizza ogni richiesta e sceglie automaticamente il modello più economico adatto. Le query semplici vengono deviate su modelli economici, risparmiando fino all&apos;80% sui costi.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="border-2 border-[#222] bg-[#111] p-6 space-y-6">
+                        {/* Toggle */}
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <div className="font-black uppercase text-sm">Abilita Model Router</div>
+                                <div className="text-[#777] text-xs font-sans mt-1">Un agente sceglie automaticamente il modello ottimale per ogni richiesta</div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const newValue = !routingEnabled
+                                    setRoutingEnabled(newValue)
+                                    updateRoutingSettings({ routing_enabled: newValue })
+                                }}
+                                className={`w-14 h-7 rounded-full transition-colors relative ${
+                                    routingEnabled ? 'bg-[#FFD700]' : 'bg-[#333]'
+                                }`}
+                            >
+                                <div className={`w-5 h-5 rounded-full bg-white absolute top-1 transition-transform ${
+                                    routingEnabled ? 'translate-x-8' : 'translate-x-1'
+                                }`} />
+                            </button>
+                        </div>
+
+                        {routingEnabled && (
+                            <>
+                                {/* Classifier Model */}
+                                <div className="border-t border-[#222] pt-6">
+                                    <div className="font-black uppercase text-sm mb-2">Modello Classificatore</div>
+                                    <div className="text-[#777] text-xs font-sans mb-4">Modello economico usato dall&apos;agente per analizzare la complessità della richiesta</div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {CLASSIFIER_MODELS.map((m) => (
+                                            <button
+                                                key={m.id}
+                                                onClick={() => { setRoutingCheapModel(m.id); updateRoutingSettings({ routing_cheap_model: m.id }) }}
+                                                className={`p-3 text-left border-2 transition-all ${
+                                                    routingCheapModel === m.id
+                                                        ? 'border-[#FFD700] bg-[#FFD700]/5'
+                                                        : 'border-[#222] bg-[#0F0F0F] hover:border-[#444]'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <span className={`text-xs font-black uppercase ${routingCheapModel === m.id ? 'text-[#FFD700]' : 'text-[#777]'}`}>{m.name}</span>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 ${routingCheapModel === m.id ? 'bg-[#FFD700]/20 text-[#FFD700]' : 'bg-[#222] text-[#555]'}`}>{m.cost}</span>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Allowed Models Grid */}
+                                <div className="border-t border-[#222] pt-6">
+                                    <div className="font-black uppercase text-sm mb-2">Modelli Disponibili</div>
+                                    <div className="text-[#777] text-xs font-sans mb-4">Seleziona i modelli tra cui l&apos;agente può scegliere. L&apos;agente userà il più economico adatto alla complessità della richiesta.</div>
+
+                                    <div className="space-y-2">
+                                        {[1, 2, 3].map((tier) => {
+                                            const tierModels = AVAILABLE_MODELS.filter(m => m.tier === tier)
+                                            const tierLabel = tier === 1 ? '🟢 Economici' : tier === 2 ? '🟡 Bilanciati' : '🔴 Premium'
+                                            return (
+                                                <div key={tier}>
+                                                    <div className="text-[10px] font-bold uppercase tracking-widest text-[#555] mb-2">{tierLabel}</div>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                                                        {tierModels.map((model) => {
+                                                            const isSelected = routingAllowedModels.includes(model.id)
+                                                            const borderColor = model.color === 'green' ? (isSelected ? 'border-green-500 bg-green-500/5' : 'border-[#222]')
+                                                                : model.color === 'yellow' ? (isSelected ? 'border-[#FFD700] bg-[#FFD700]/5' : 'border-[#222]')
+                                                                : (isSelected ? 'border-red-500 bg-red-500/5' : 'border-[#222]')
+                                                            return (
+                                                                <button
+                                                                    key={model.id}
+                                                                    onClick={() => toggleModelInList(model.id)}
+                                                                    className={`p-3 text-left border-2 transition-all bg-[#0F0F0F] hover:border-[#444] ${borderColor}`}
+                                                                >
+                                                                    <div className="flex items-center justify-between">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div className={`w-4 h-4 border-2 flex items-center justify-center ${
+                                                                                isSelected
+                                                                                    ? model.color === 'green' ? 'border-green-500 bg-green-500' : model.color === 'yellow' ? 'border-[#FFD700] bg-[#FFD700]' : 'border-red-500 bg-red-500'
+                                                                                    : 'border-[#555]'
+                                                                            }`}>
+                                                                                {isSelected && <Check size={10} className="text-black" />}
+                                                                            </div>
+                                                                            <span className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-[#777]'}`}>{model.name}</span>
+                                                                        </div>
+                                                                        <span className={`text-[10px] font-bold px-2 py-0.5 ${
+                                                                            isSelected ? 'bg-white/10 text-white' : 'bg-[#222] text-[#555]'
+                                                                        }`}>
+                                                                            Tier {model.tier}
+                                                                        </span>
+                                                                    </div>
+                                                                </button>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* How it works */}
+                                <div className="border-t border-[#222] pt-6">
+                                    <div className="bg-[#0A0A0A] border border-[#222] p-4">
+                                        <div className="text-[10px] font-bold uppercase tracking-widest text-[#555] mb-3">Come Funziona</div>
+                                        <div className="space-y-2 text-[11px] font-sans text-[#999]">
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-[#FFD700] font-bold">1.</span>
+                                                <span>La tua app chiama il proxy con il modello richiesto (es. <code className="text-[#FFD700]">gpt-4o</code>)</span>
+                                            </div>
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-[#FFD700] font-bold">2.</span>
+                                                <span>L&apos;agente analizza la richiesta usando <code className="text-[#FFD700]">{routingCheapModel}</code> (~$0.0001)</span>
+                                            </div>
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-[#FFD700] font-bold">3.</span>
+                                                <span>Se adatta, la richiesta viene deviata su un modello più economico</span>
+                                            </div>
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-[#FFD700] font-bold">4.</span>
+                                                <span>Risparmio fino all&apos;80% sui task semplici, trasparente per la tua app</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </section>
+
+                {/* Prompt Compression Section */}
+                <section className="mb-8">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <Minimize2 size={20} className="text-[#FFD700]" />
+                            <h2 className="text-xl font-black uppercase italic">Prompt Compression</h2>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {isSavingCompression && <RefreshCw size={14} className="animate-spin text-[#555]" />}
+                            <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 ${compressionEnabled
+                                ? 'bg-green-500/10 text-green-400 border border-green-500/30'
+                                : 'bg-[#222] text-[#555] border border-[#333]'
+                                }`}>
+                                {compressionEnabled ? 'Attivo' : 'Disattivato'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="bg-teal-500/5 border-2 border-teal-500/20 p-4 mb-6">
+                        <div className="flex items-start gap-3">
+                            <Minimize2 size={18} className="text-teal-400 shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-teal-300 text-sm font-sans">
+                                    <strong className="font-bold uppercase">Prompt Compression:</strong> Comprime automaticamente prompt molto lunghi (tipici di scenari RAG) estraendo solo le informazioni rilevanti. Riduce i token di input del 40-70% senza perdere informazioni chiave.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="border-2 border-[#222] bg-[#111] p-6 space-y-6">
+                        {/* Toggle */}
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <div className="font-black uppercase text-sm">Abilita Prompt Compression</div>
+                                <div className="text-[#777] text-xs font-sans mt-1">Comprime automaticamente contesto lungo prima di inviarlo al modello principale</div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const newValue = !compressionEnabled
+                                    setCompressionEnabled(newValue)
+                                    updateCompressionSettings({ compression_enabled: newValue })
+                                }}
+                                className={`w-14 h-7 rounded-full transition-colors relative ${
+                                    compressionEnabled ? 'bg-[#FFD700]' : 'bg-[#333]'
+                                }`}
+                            >
+                                <div className={`w-5 h-5 rounded-full bg-white absolute top-1 transition-transform ${
+                                    compressionEnabled ? 'translate-x-8' : 'translate-x-1'
+                                }`} />
+                            </button>
+                        </div>
+
+                        {compressionEnabled && (
+                            <>
+                                {/* Compressor Model */}
+                                <div className="border-t border-[#222] pt-6">
+                                    <div className="font-black uppercase text-sm mb-2">Modello Compressore</div>
+                                    <div className="text-[#777] text-xs font-sans mb-4">Modello usato per comprimere il contesto. Modelli più economici = costo compressione minore.</div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {CLASSIFIER_MODELS.map((m) => (
+                                            <button
+                                                key={m.id}
+                                                onClick={() => { setCompressionModel(m.id); updateCompressionSettings({ compression_model: m.id }) }}
+                                                className={`p-3 text-left border-2 transition-all ${
+                                                    compressionModel === m.id
+                                                        ? 'border-[#FFD700] bg-[#FFD700]/5'
+                                                        : 'border-[#222] bg-[#0F0F0F] hover:border-[#444]'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <span className={`text-xs font-black uppercase ${compressionModel === m.id ? 'text-[#FFD700]' : 'text-[#777]'}`}>{m.name}</span>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 ${compressionModel === m.id ? 'bg-[#FFD700]/20 text-[#FFD700]' : 'bg-[#222] text-[#555]'}`}>{m.cost}</span>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Threshold */}
+                                <div className="border-t border-[#222] pt-6">
+                                    <div className="font-black uppercase text-sm mb-2">Soglia di Attivazione</div>
+                                    <div className="text-[#777] text-xs font-sans mb-4">La compressione si attiva solo quando il prompt supera questa soglia di token stimati.</div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                                        {THRESHOLD_OPTIONS.map((opt) => (
+                                            <button
+                                                key={opt.value}
+                                                onClick={() => {
+                                                    setCompressionThreshold(opt.value)
+                                                    updateCompressionSettings({ compression_threshold: opt.value })
+                                                }}
+                                                className={`p-3 text-center border-2 transition-all ${
+                                                    compressionThreshold === opt.value
+                                                        ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]'
+                                                        : 'border-[#222] bg-[#0F0F0F] text-[#777] hover:border-[#444] hover:text-white'
+                                                }`}
+                                            >
+                                                <div className="text-xs font-black uppercase">{opt.label}</div>
+                                                <div className="text-[10px] mt-1 opacity-70">{opt.desc}</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Savings info */}
+                                <div className="border-t border-[#222] pt-6">
+                                    <div className="bg-[#0A0A0A] border border-[#222] p-4">
+                                        <div className="text-[10px] font-bold uppercase tracking-widest text-[#555] mb-3">Stima Risparmio</div>
+                                        <div className="flex items-end gap-4">
+                                            <div className="text-center">
+                                                <div className="text-[#555] text-[10px] font-bold uppercase mb-1">Senza</div>
+                                                <div className="w-8 bg-red-500/30 mx-auto" style={{ height: '60px' }} />
+                                                <div className="text-[#777] text-[10px] mt-1">5000</div>
+                                            </div>
+                                            <div className="text-center">
+                                                <div className="text-teal-400 text-[10px] font-bold uppercase mb-1">Con</div>
+                                                <div className="w-8 bg-teal-500/30 mx-auto" style={{ height: '24px' }} />
+                                                <div className="text-[#777] text-[10px] mt-1">~2000</div>
+                                            </div>
+                                            <div className="flex-1 text-right">
+                                                <div className="text-2xl font-black text-teal-400">-60%</div>
+                                                <div className="text-[#555] text-[10px] font-bold uppercase">token di input risparmiati</div>
                                             </div>
                                         </div>
                                     </div>
