@@ -91,14 +91,14 @@ export async function POST(request: NextRequest) {
         const body = await request.json()
         const { label } = body
 
-        // Get user's email
+        // Get user's profile and all global settings
         const { data: profile } = await supabase
             .from('profiles')
-            .select('email')
+            .select('*')
             .eq('id', user.id)
             .single()
 
-        // Insert with user_id and email
+        // Insert with user_id, email, and inherited global settings
         const { data, error } = await supabase
             .from('api_keys')
             .insert({
@@ -109,6 +109,16 @@ export async function POST(request: NextRequest) {
                 plan: 'free',
                 monthly_budget: 100,
                 is_active: true,
+                semantic_cache_enabled: profile?.semantic_cache_enabled ?? false,
+                semantic_cache_ttl_minutes: profile?.semantic_cache_ttl_minutes ?? 60,
+                pruning_enabled: profile?.pruning_enabled ?? false,
+                pruning_intensity: profile?.pruning_intensity ?? 'medium',
+                routing_enabled: profile?.routing_enabled ?? false,
+                routing_cheap_model: profile?.routing_cheap_model ?? 'gpt-4o-mini',
+                routing_allowed_models: profile?.routing_allowed_models ?? ['gpt-4o-mini', 'gpt-5.4', 'gpt-5.4-pro'],
+                compression_enabled: profile?.compression_enabled ?? false,
+                compression_model: profile?.compression_model ?? 'gpt-4o-mini',
+                compression_threshold: profile?.compression_threshold ?? 2000,
             })
             .select('id, api_key')
             .single()

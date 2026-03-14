@@ -18,12 +18,32 @@ async function getUserIdFromToken(request: NextRequest): Promise<string | null> 
   return user.id
 }
 
-/** GET /api/settings/pruning — Read current pruning settings */
+/** GET /api/settings/pruning?api_key_id=xxx */
 export async function GET(request: NextRequest) {
   const userId = await getUserIdFromToken(request)
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!supabaseAdmin) return NextResponse.json({ error: 'Server not configured' }, { status: 500 })
 
+  const apiKeyId = request.nextUrl.searchParams.get('api_key_id')
+
+  // Per-key settings
+  if (apiKeyId) {
+    const { data: keyData } = await supabaseAdmin
+      .from('api_keys')
+      .select('pruning_enabled, pruning_intensity')
+      .eq('id', apiKeyId)
+      .eq('user_id', userId)
+      .single()
+
+    if (keyData) {
+      return NextResponse.json({
+        pruning_enabled: keyData.pruning_enabled ?? false,
+        pruning_intensity: keyData.pruning_intensity ?? 'medium',
+      })
+    }
+  }
+
+  // Fallback: profile defaults
   const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('pruning_enabled, pruning_intensity')
@@ -36,13 +56,20 @@ export async function GET(request: NextRequest) {
   })
 }
 
-/** PATCH /api/settings/pruning — Update pruning settings */
+/** PATCH /api/settings/pruning */
 export async function PATCH(request: NextRequest) {
   const userId = await getUserIdFromToken(request)
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!supabaseAdmin) return NextResponse.json({ error: 'Server not configured' }, { status: 500 })
 
-  const body = await request.json()
+  let body: Record<string, any>
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  const apiKeyId = body.api_key_id as string | undefined
   const validIntensities = ['low', 'medium', 'high']
   const updates: Record<string, any> = {}
 
@@ -64,21 +91,39 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
   }
 
+  // Per-key update
+  if (apiKeyId) {
+    const { error: keyError } = await supabaseAdmin
+      .from('api_keys')
+      .update(updates)
+      .eq('id', apiKeyId)
+      .eq('user_id', userId)
+
+    if (keyError) {
+      return NextResponse.json({ error: 'Failed to update key settings: ' + keyError.message }, { status: 500 })
+    }
+    return NextResponse.json({ success: true, scope: 'api_key', api_key_id: apiKeyId, ...updates })
+  }
+
   const { error: profileError } = await supabaseAdmin
     .from('profiles')
     .update(updates)
     .eq('id', userId)
 
   if (profileError) {
-    return NextResponse.json({ error: 'Failed to update: ' + profileError.message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to update profile: ' + profileError.message }, { status: 500 })
   }
 
   // Sync to api_keys
-  await supabaseAdmin
+  const { error: keysError } = await supabaseAdmin
     .from('api_keys')
     .update(updates)
     .eq('user_id', userId)
     .eq('is_active', true)
 
-  return NextResponse.json({ success: true, ...updates })
+  if (keysError) {
+    console.error('Failed to sync pruning to api_keys:', keysError.message)
+  }
+
+  return NextResponse.json({ success: true, scope: 'global', ...updates })
 }

@@ -132,11 +132,10 @@ export default function SettingsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    async function loadCacheSettings() {
+    async function loadCacheSettings(keyId?: string | null) {
         try {
-            const response = await fetch('/api/settings/cache', {
-                headers: authHeaders()
-            })
+            const url = keyId ? `/api/settings/cache?api_key_id=${keyId}` : '/api/settings/cache'
+            const response = await fetch(url, { headers: authHeaders() })
             if (response.ok) {
                 const data = await response.json()
                 setSemanticCacheEnabled(data.semantic_cache_enabled || false)
@@ -150,13 +149,15 @@ export default function SettingsPage() {
     async function updateCacheSettings(updates: { semantic_cache_enabled?: boolean; semantic_cache_ttl_minutes?: number }) {
         setIsSavingCache(true)
         try {
+            const payload = selectedKeyId ? { ...updates, api_key_id: selectedKeyId } : updates
             const response = await fetch('/api/settings/cache', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', ...authHeaders() },
-                body: JSON.stringify(updates)
+                body: JSON.stringify(payload)
             })
             if (response.ok) {
-                showNotification('success', 'Impostazioni cache aggiornate')
+                const scope = selectedKeyId ? 'chiave selezionata' : 'tutte le chiavi'
+                showNotification('success', `Impostazioni cache aggiornate (${scope})`)
             } else {
                 showNotification('error', 'Errore nel salvataggio')
             }
@@ -167,9 +168,10 @@ export default function SettingsPage() {
         }
     }
 
-    async function loadPruningSettings() {
+    async function loadPruningSettings(keyId?: string | null) {
         try {
-            const response = await fetch('/api/settings/pruning', { headers: authHeaders() })
+            const url = keyId ? `/api/settings/pruning?api_key_id=${keyId}` : '/api/settings/pruning'
+            const response = await fetch(url, { headers: authHeaders() })
             if (response.ok) {
                 const data = await response.json()
                 setPruningEnabled(data.pruning_enabled || false)
@@ -181,13 +183,15 @@ export default function SettingsPage() {
     async function updatePruningSettings(updates: { pruning_enabled?: boolean; pruning_intensity?: string }) {
         setIsSavingPruning(true)
         try {
+            const payload = selectedKeyId ? { ...updates, api_key_id: selectedKeyId } : updates
             const response = await fetch('/api/settings/pruning', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', ...authHeaders() },
-                body: JSON.stringify(updates)
+                body: JSON.stringify(payload)
             })
             if (response.ok) {
-                showNotification('success', 'Impostazioni pruning aggiornate')
+                const scope = selectedKeyId ? 'chiave selezionata' : 'tutte le chiavi'
+                showNotification('success', `Impostazioni pruning aggiornate (${scope})`)
             } else {
                 showNotification('error', 'Errore nel salvataggio')
             }
@@ -672,8 +676,142 @@ export default function SettingsPage() {
                     )}
                 </section>
 
-                {/* Smart Cache Section */}
+                {/* ═══════════════════════════════════════════════════════ */}
+                {/* GLOBAL VS CUSTOM MODE SELECTOR                          */}
+                {/* ═══════════════════════════════════════════════════════ */}
                 <section className="mb-8">
+                    <div className="flex items-center gap-3 mb-6">
+                        <Route size={20} className="text-[#FFD700]" />
+                        <h2 className="text-xl font-black uppercase italic">Configurazione Funzionalità</h2>
+                    </div>
+
+                    {/* ── MODE SWITCHER ── */}
+                    <div className="grid grid-cols-2 gap-0 mb-6">
+                        <button
+                            onClick={() => {
+                                setSelectedKeyId(null)
+                                loadRoutingSettings(null)
+                                loadCompressionSettings(null)
+                                loadCacheSettings(null)
+                                loadPruningSettings(null)
+                            }}
+                            className={`p-5 border-2 transition-all text-left ${
+                                !selectedKeyId
+                                    ? 'border-[#FFD700] bg-[#FFD700]/10 border-r-0'
+                                    : 'border-[#222] bg-[#0A0A0A] hover:bg-[#111] border-r-0'
+                            }`}
+                        >
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className={`w-8 h-8 flex items-center justify-center text-lg ${
+                                    !selectedKeyId ? 'bg-[#FFD700] text-black' : 'bg-[#222] text-[#555]'
+                                }`}>🌐</div>
+                                <div>
+                                    <div className={`font-black uppercase text-sm ${!selectedKeyId ? 'text-[#FFD700]' : 'text-[#777]'}`}>
+                                        Globale
+                                    </div>
+                                    <div className="text-[10px] text-[#555] font-bold uppercase tracking-widest">Tutte le chiavi</div>
+                                </div>
+                            </div>
+                            <p className="text-[#999] text-[10px] font-sans leading-relaxed">
+                                Le stesse impostazioni si applicano a <strong className="text-white">tutte le chiavi API</strong> del tuo account.
+                            </p>
+                        </button>
+                        <button
+                            onClick={() => {
+                                const firstKey = apiKeys.find(k => k.isActive)
+                                if (firstKey) {
+                                    setSelectedKeyId(firstKey.id)
+                                    loadRoutingSettings(firstKey.id)
+                                    loadCompressionSettings(firstKey.id)
+                                    loadCacheSettings(firstKey.id)
+                                    loadPruningSettings(firstKey.id)
+                                }
+                            }}
+                            className={`p-5 border-2 transition-all text-left ${
+                                selectedKeyId
+                                    ? 'border-purple-500 bg-purple-500/10'
+                                    : 'border-[#222] bg-[#0A0A0A] hover:bg-[#111]'
+                            }`}
+                        >
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className={`w-8 h-8 flex items-center justify-center text-lg ${
+                                    selectedKeyId ? 'bg-purple-500 text-white' : 'bg-[#222] text-[#555]'
+                                }`}>🔑</div>
+                                <div>
+                                    <div className={`font-black uppercase text-sm ${selectedKeyId ? 'text-purple-400' : 'text-[#777]'}`}>
+                                        Custom
+                                    </div>
+                                    <div className="text-[10px] text-[#555] font-bold uppercase tracking-widest">Per singola chiave</div>
+                                </div>
+                            </div>
+                            <p className="text-[#999] text-[10px] font-sans leading-relaxed">
+                                Configura impostazioni <strong className="text-white">diverse per ogni chiave API</strong>. Ideale per ambienti separati.
+                            </p>
+                        </button>
+                    </div>
+
+                    {/* ── CUSTOM: Key Tabs ── */}
+                    {selectedKeyId && (
+                        <div className="mb-6">
+                            <div className="flex items-center gap-2 mb-3">
+                                <div className="text-[10px] font-bold uppercase tracking-widest text-purple-400">Seleziona chiave da configurare:</div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {apiKeys.filter(k => k.isActive).map((k) => (
+                                    <button
+                                        key={k.id}
+                                        onClick={() => {
+                                            setSelectedKeyId(k.id)
+                                            loadRoutingSettings(k.id)
+                                            loadCompressionSettings(k.id)
+                                            loadCacheSettings(k.id)
+                                            loadPruningSettings(k.id)
+                                        }}
+                                        className={`px-4 py-2 border-2 transition-all flex items-center gap-2 ${
+                                            selectedKeyId === k.id
+                                                ? 'border-purple-500 bg-purple-500/15 text-purple-300'
+                                                : 'border-[#222] bg-[#0F0F0F] text-[#777] hover:border-[#444] hover:text-white'
+                                        }`}
+                                    >
+                                        <Key size={12} />
+                                        <span className="text-xs font-bold uppercase">{k.label}</span>
+                                        {selectedKeyId === k.id && (
+                                            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── ACTIVE SCOPE BANNER ── */}
+                    <div className={`p-3 mb-6 flex items-center gap-3 ${
+                        selectedKeyId
+                            ? 'bg-purple-500/10 border-2 border-purple-500/30'
+                            : 'bg-[#FFD700]/5 border-2 border-[#FFD700]/20'
+                    }`}>
+                        {selectedKeyId ? (
+                            <>
+                                <AlertTriangle size={16} className="text-purple-400 shrink-0" />
+                                <div className="text-purple-300 text-xs font-sans">
+                                    Stai configurando <strong className="font-bold text-purple-200">
+                                        {apiKeys.find(k => k.id === selectedKeyId)?.label || 'Chiave'}
+                                    </strong> — le modifiche si applicano SOLO a questa chiave API
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <Zap size={16} className="text-[#FFD700] shrink-0" />
+                                <div className="text-[#ccc] text-xs font-sans">
+                                    Modalità <strong className="font-bold text-[#FFD700]">Globale</strong> — ogni modifica si applica a tutte le tue chiavi API
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </section>
+
+                {/* Smart Cache Section */}
+                <section className={`mb-8 ${selectedKeyId ? 'border-l-4 border-purple-500/30 pl-4' : ''}`}>
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
                             <Database size={20} className="text-[#FFD700]" />
@@ -785,7 +923,7 @@ export default function SettingsPage() {
                 </section>
 
                 {/* Context Pruning Section */}
-                <section className="mb-8">
+                <section className={`mb-8 ${selectedKeyId ? 'border-l-4 border-purple-500/30 pl-4' : ''}`}>
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
                             <Scissors size={20} className="text-[#FFD700]" />
@@ -953,133 +1091,6 @@ export default function SettingsPage() {
                 </section>
 
 
-                {/* ═══════════════════════════════════════════════════════ */}
-                {/* AGENTIC SETTINGS — Mode Selector                        */}
-                {/* ═══════════════════════════════════════════════════════ */}
-                <section className="mb-8">
-                    <div className="flex items-center gap-3 mb-6">
-                        <Route size={20} className="text-[#FFD700]" />
-                        <h2 className="text-xl font-black uppercase italic">Impostazioni Agentiche</h2>
-                    </div>
-
-                    {/* ── MODE SWITCHER ── */}
-                    <div className="grid grid-cols-2 gap-0 mb-6">
-                        <button
-                            onClick={() => {
-                                setSelectedKeyId(null)
-                                loadRoutingSettings(null)
-                                loadCompressionSettings(null)
-                            }}
-                            className={`p-5 border-2 transition-all text-left ${
-                                !selectedKeyId
-                                    ? 'border-[#FFD700] bg-[#FFD700]/10 border-r-0'
-                                    : 'border-[#222] bg-[#0A0A0A] hover:bg-[#111] border-r-0'
-                            }`}
-                        >
-                            <div className="flex items-center gap-3 mb-2">
-                                <div className={`w-8 h-8 flex items-center justify-center text-lg ${
-                                    !selectedKeyId ? 'bg-[#FFD700] text-black' : 'bg-[#222] text-[#555]'
-                                }`}>🌐</div>
-                                <div>
-                                    <div className={`font-black uppercase text-sm ${!selectedKeyId ? 'text-[#FFD700]' : 'text-[#777]'}`}>
-                                        Globale
-                                    </div>
-                                    <div className="text-[10px] text-[#555] font-bold uppercase tracking-widest">Tutte le chiavi</div>
-                                </div>
-                            </div>
-                            <p className="text-[#999] text-[10px] font-sans leading-relaxed">
-                                Le stesse impostazioni si applicano a <strong className="text-white">tutte le chiavi API</strong> del tuo account.
-                            </p>
-                        </button>
-                        <button
-                            onClick={() => {
-                                const firstKey = apiKeys.find(k => k.isActive)
-                                if (firstKey) {
-                                    setSelectedKeyId(firstKey.id)
-                                    loadRoutingSettings(firstKey.id)
-                                    loadCompressionSettings(firstKey.id)
-                                }
-                            }}
-                            className={`p-5 border-2 transition-all text-left ${
-                                selectedKeyId
-                                    ? 'border-purple-500 bg-purple-500/10'
-                                    : 'border-[#222] bg-[#0A0A0A] hover:bg-[#111]'
-                            }`}
-                        >
-                            <div className="flex items-center gap-3 mb-2">
-                                <div className={`w-8 h-8 flex items-center justify-center text-lg ${
-                                    selectedKeyId ? 'bg-purple-500 text-white' : 'bg-[#222] text-[#555]'
-                                }`}>🔑</div>
-                                <div>
-                                    <div className={`font-black uppercase text-sm ${selectedKeyId ? 'text-purple-400' : 'text-[#777]'}`}>
-                                        Custom
-                                    </div>
-                                    <div className="text-[10px] text-[#555] font-bold uppercase tracking-widest">Per singola chiave</div>
-                                </div>
-                            </div>
-                            <p className="text-[#999] text-[10px] font-sans leading-relaxed">
-                                Configura impostazioni <strong className="text-white">diverse per ogni chiave API</strong>. Ideale per ambienti separati.
-                            </p>
-                        </button>
-                    </div>
-
-                    {/* ── CUSTOM: Key Tabs ── */}
-                    {selectedKeyId && (
-                        <div className="mb-6">
-                            <div className="flex items-center gap-2 mb-3">
-                                <div className="text-[10px] font-bold uppercase tracking-widest text-purple-400">Seleziona chiave da configurare:</div>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {apiKeys.filter(k => k.isActive).map((k) => (
-                                    <button
-                                        key={k.id}
-                                        onClick={() => {
-                                            setSelectedKeyId(k.id)
-                                            loadRoutingSettings(k.id)
-                                            loadCompressionSettings(k.id)
-                                        }}
-                                        className={`px-4 py-2 border-2 transition-all flex items-center gap-2 ${
-                                            selectedKeyId === k.id
-                                                ? 'border-purple-500 bg-purple-500/15 text-purple-300'
-                                                : 'border-[#222] bg-[#0F0F0F] text-[#777] hover:border-[#444] hover:text-white'
-                                        }`}
-                                    >
-                                        <Key size={12} />
-                                        <span className="text-xs font-bold uppercase">{k.label}</span>
-                                        {selectedKeyId === k.id && (
-                                            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* ── ACTIVE SCOPE BANNER ── */}
-                    <div className={`p-3 mb-6 flex items-center gap-3 ${
-                        selectedKeyId
-                            ? 'bg-purple-500/10 border-2 border-purple-500/30'
-                            : 'bg-[#FFD700]/5 border-2 border-[#FFD700]/20'
-                    }`}>
-                        {selectedKeyId ? (
-                            <>
-                                <AlertTriangle size={16} className="text-purple-400 shrink-0" />
-                                <div className="text-purple-300 text-xs font-sans">
-                                    Stai configurando <strong className="font-bold text-purple-200">
-                                        {apiKeys.find(k => k.id === selectedKeyId)?.label || 'Chiave'}
-                                    </strong> — le modifiche si applicano SOLO a questa chiave API
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <Zap size={16} className="text-[#FFD700] shrink-0" />
-                                <div className="text-[#ccc] text-xs font-sans">
-                                    Modalità <strong className="font-bold text-[#FFD700]">Globale</strong> — ogni modifica si applica a tutte le tue chiavi API
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </section>
 
                 {/* ═══ Model Router Agent Section ═══ */}
                 <section className={`mb-8 ${selectedKeyId ? 'border-l-4 border-purple-500/30 pl-4' : ''}`}>

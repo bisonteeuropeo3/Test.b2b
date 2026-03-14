@@ -7,16 +7,11 @@ const supabaseAdmin = supabaseUrl && supabaseKey
   ? createClient(supabaseUrl, supabaseKey)
   : null
 
-/**
- * Extracts the authenticated user ID from a Supabase JWT in the Authorization header.
- */
 async function getUserIdFromToken(request: NextRequest): Promise<string | null> {
   const authHeader = request.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
-
   const token = authHeader.replace('Bearer ', '')
   if (!supabaseUrl || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return null
-
   const userClient = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
   const { data: { user }, error } = await userClient.auth.getUser(token)
   if (error || !user) return null
@@ -24,54 +19,62 @@ async function getUserIdFromToken(request: NextRequest): Promise<string | null> 
 }
 
 /**
- * GET /api/settings/cache — Read current semantic cache settings
+ * GET /api/settings/cache?api_key_id=xxx
  */
 export async function GET(request: NextRequest) {
   const userId = await getUserIdFromToken(request)
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!supabaseAdmin) return NextResponse.json({ error: 'Server not configured' }, { status: 500 })
+
+  const apiKeyId = request.nextUrl.searchParams.get('api_key_id')
+
+  // Per-key settings
+  if (apiKeyId) {
+    const { data: keyData } = await supabaseAdmin
+      .from('api_keys')
+      .select('semantic_cache_enabled, semantic_cache_ttl_minutes')
+      .eq('id', apiKeyId)
+      .eq('user_id', userId)
+      .single()
+
+    if (keyData) {
+      return NextResponse.json({
+        semantic_cache_enabled: keyData.semantic_cache_enabled ?? false,
+        semantic_cache_ttl_minutes: keyData.semantic_cache_ttl_minutes ?? 60,
+      })
+    }
   }
 
-  if (!supabaseAdmin) {
-    return NextResponse.json({ error: 'Server not configured' }, { status: 500 })
-  }
-
-  const { data: profile, error } = await supabaseAdmin
+  // Fallback: profile defaults
+  const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('semantic_cache_enabled, semantic_cache_ttl_minutes')
     .eq('id', userId)
     .single()
 
-  if (error || !profile) {
-    return NextResponse.json({
-      semantic_cache_enabled: false,
-      semantic_cache_ttl_minutes: 60,
-    })
-  }
-
   return NextResponse.json({
-    semantic_cache_enabled: profile.semantic_cache_enabled ?? false,
-    semantic_cache_ttl_minutes: profile.semantic_cache_ttl_minutes ?? 60,
+    semantic_cache_enabled: profile?.semantic_cache_enabled ?? false,
+    semantic_cache_ttl_minutes: profile?.semantic_cache_ttl_minutes ?? 60,
   })
 }
 
 /**
- * PATCH /api/settings/cache — Update semantic cache settings
- * Body: { semantic_cache_enabled?: boolean, semantic_cache_ttl_minutes?: number }
+ * PATCH /api/settings/cache
+ * Body: { api_key_id?: string, semantic_cache_enabled?: boolean, semantic_cache_ttl_minutes?: number }
  */
 export async function PATCH(request: NextRequest) {
   const userId = await getUserIdFromToken(request)
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!supabaseAdmin) return NextResponse.json({ error: 'Server not configured' }, { status: 500 })
+
+  let body: Record<string, any>
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  if (!supabaseAdmin) {
-    return NextResponse.json({ error: 'Server not configured' }, { status: 500 })
-  }
-
-  const body = await request.json()
-
-  // Validate TTL options
+  const apiKeyId = body.api_key_id as string | undefined
   const validTtlValues = [5, 15, 30, 60, 360, 1440, 4320, 10080]
   const updates: Record<string, any> = {}
 
@@ -93,25 +96,39 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
   }
 
-  // Update profile
+  // Per-key update
+  if (apiKeyId) {
+    const { error: keyError } = await supabaseAdmin
+      .from('api_keys')
+      .update(updates)
+      .eq('id', apiKeyId)
+      .eq('user_id', userId)
+
+    if (keyError) {
+      return NextResponse.json({ error: 'Failed to update key settings: ' + keyError.message }, { status: 500 })
+    }
+    return NextResponse.json({ success: true, scope: 'api_key', api_key_id: apiKeyId, ...updates })
+  }
+
+  // Global update
   const { error: profileError } = await supabaseAdmin
     .from('profiles')
     .update(updates)
     .eq('id', userId)
 
   if (profileError) {
-    return NextResponse.json(
-      { error: 'Failed to update settings: ' + profileError.message },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to update profile: ' + profileError.message }, { status: 500 })
   }
 
-  // Also update all active API keys for this user
-  await supabaseAdmin
+  const { error: keysError } = await supabaseAdmin
     .from('api_keys')
     .update(updates)
     .eq('user_id', userId)
     .eq('is_active', true)
 
-  return NextResponse.json({ success: true, ...updates })
+  if (keysError) {
+    console.error('Failed to sync cache to api_keys:', keysError.message)
+  }
+
+  return NextResponse.json({ success: true, scope: 'global', ...updates })
 }
